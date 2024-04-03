@@ -10,7 +10,7 @@ class FixationFilter():
         self.max_angle_between_fixations = 0.5 # Komogortsev et al. 2010
         self.fixation_duration_threshold = 0.060 # to remove fixations that are too short Komogortsev et al. 2010
 
-        self.velocity_threshold = 30
+        self.velocity_threshold = 30 # Olsen et al 2012 I-VT fixation filter
 
         self.fixation_count = 0
         self.final_fixation_count = 0
@@ -87,10 +87,6 @@ class FixationFilter():
 
                 self.pixels_x[~valid_data_mask] = np.nan
                 self.pixels_y[~valid_data_mask] = np.nan
-
-
-
-
         elif method == 'left':
             self.gaze_point_x = self.left_gaze_point_3dx
             self.gaze_point_y = self.left_gaze_point_3dy
@@ -114,12 +110,6 @@ class FixationFilter():
             self.normalized_y = self.right_normalized_y
             self.pixels_x = self.right_pixels_x
             self.pixels_y = self.right_pixels_y
-
-    def fill_in_gaps(self, max_gap_length=0.075):
-        ''''Fill in gaps in the data by interpolating between the two closest points. This is not really necessary'''
-        # iterate through each sample
-        for i in range(1, len(self.gaze_point_x)):
-            pass
 
     def noise_filter(self, method ='moving_average', alpha=0.5, window_size=4):
         '''Remove noise from the data by applying a low-pass filter
@@ -149,7 +139,6 @@ class FixationFilter():
                 self.denoised_gaze_point_y.append(self.gaze_point_y[i])
                 self.denoised_pixel_x.append(self.pixels_x[i])
                 self.denoised_pixel_y.append(self.pixels_y[i])
-
             else:
                 self.denoised_gaze_point_x.append(np.median(self.gaze_point_x[i-half_window:i+half_window]))
                 self.denoised_gaze_point_y.append(np.median(self.gaze_point_y[i-half_window:i+half_window]))
@@ -202,7 +191,62 @@ class FixationFilter():
                 self.denoised_pixel_x.append(np.mean(self.pixels_x[i-half_window:i+half_window]))
                 self.denoised_pixel_y.append(np.mean(self.pixels_y[i-half_window:i+half_window]))
 
-    def velocity_calculator(self, window_size=0.020):
+    def fill_in_gaps(self, max_gap_length=0.075):
+        '''Fill in gaps in the data by interpolating between the two closest points. This is not really necessary'''
+        self.interpolated_pixel_x = []
+        self.interpolated_pixel_y = []
+        gap_start_index = None
+        gap_length = 0
+        # iterate through each sample
+        for i in range(len(self.pixels_x)):
+            if self.is_valid_sample(i):
+                if gap_start_index is not None:
+                    # interpolate the gap
+                    self.interpolate_gap(gap_start_index, i, gap_length)
+                    gap_start_index = None
+                    gap_length = 0
+                self.interpolated_pixel_x.append(self.pixels_x[i])
+                self.interpolated_pixel_y.append(self.pixels_y[i])
+            else:
+                if gap_start_index is None:
+                    gap_start_index = i
+                gap_length += 1
+                if gap_length > max_gap_length:
+                    # consider it as a 'valid' gap
+                    gap_start_index = None
+                    gap_length = 0
+        # check if there is a gap at the end of the data
+        if gap_start_index is not None:
+            self.interpolate_gap(gap_start_index, len(self.pixel), gap_length)
+
+        print('Interpolated pixel x', self.interpolated_pixel_x)
+        print('Interpolated pixel y', self.interpolated_pixel_y)
+
+    def is_valid_sample(self, index):
+        # dheck if the sample contains valid gaze data
+        # qccess self.left_validity for validity codes
+        if self.left_validity[index] == 0 or self.left_validity[index] == 1:
+            return True
+        else:
+            return False
+        
+    def interpolate_gap(self, start_index, end_index):
+        # interpolate the missing data in the gap
+        last_valid_index = start_index - 1
+        next_valid_index = end_index
+        last_valid_timestamp = self.time[last_valid_index]
+        next_valid_timestamp = self.time[next_valid_index]
+        total_gap_duration = next_valid_timestamp - last_valid_timestamp
+        
+        for i in range(start_index, end_index):
+            current_timestamp = self.time[i]
+            scaling_factor = (current_timestamp - last_valid_timestamp) / total_gap_duration
+            interpolated_x = (self.pixel[next_valid_index][0] - self.pixel[last_valid_index][0]) * scaling_factor + self.pixel[last_valid_index][0]
+            interpolated_y = (self.pixel[next_valid_index][1] - self.pixel[last_valid_index][1]) * scaling_factor + self.pixel[last_valid_index][1]
+            self.interpolated_pixel_x.append(interpolated_x)
+            self.interpolated_pixel_y.append(interpolated_y)
+
+    def velocity_calculator(self):
         '''Calculates the velocity as the rate of change of the angle between the gaze vector and the eye position vector. In degrees per second.'''
         # calculate velocity
         eye_positions = np.column_stack((self.eye_position_x, self.eye_position_y, self.eye_position_z))
@@ -220,12 +264,56 @@ class FixationFilter():
         self.theta = np.degrees(np.arccos(cosine_theta))
         self.velocity = np.gradient(self.theta, self.time)
 
+    def average_velocity_calculator(self, window_length=0.020):
+        self.average_velocity = []
+        self.average_theta = []
+        # number of samples in window length
+        window_size = int(window_length / np.mean(np.diff(self.time)))
+        # calculate the average velocity
+        for i in range(len(self.gaze_point_x)):
+            # Determine start and end indices of the window
+            start_index = max(0, i - window_size // 2)
+            end_index = min(len(self.gaze_point_x) - 1, i + window_size // 2)
+            if end_index - start_index + 1 >= 2: # minimum of 2 samples
+                # extract relevant gaze point and eye position data
+                gaze_positions_window = np.column_stack((self.gaze_point_x[start_index:end_index+1],
+                                                          self.gaze_point_y[start_index:end_index+1],
+                                                          self.gaze_point_z[start_index:end_index+1]))
+                eye_position = np.array([self.eye_position_x[i], self.eye_position_y[i], self.eye_position_z[i]])
 
+                # calculate visual angle between first and last samples
+                angle = self.calculate_visual_angle(gaze_positions_window[0], gaze_positions_window[-1], eye_position)
 
-    def average_velocity_calculator(self, window_size=0.020):
-        # calculate velocity in a window of 20 ms and also use denoised data instead of raw data
-        pass
+                # calculate time difference between first and last samples
+                time_difference = self.time[end_index] - self.time[start_index]
 
+                # calculate velocity
+                velocity = angle / time_difference
+                self.average_theta.append(angle)
+                self.average_velocity.append(velocity)
+            else:
+                self.average_velocity.append(np.nan)
+                self.average_theta.append(np.nan)
+        
+        # print('average velocity', self.average_velocity)
+        # print('average theta', self.average_theta)
+
+    def calculate_visual_angle(gaze_point1, gaze_point2, eye_position):
+        '''Calculate the visual angle between two gaze points and the eye position'''
+        # calculate the gaze vectors
+        gaze_vector1 = gaze_point1 - eye_position
+        gaze_vector2 = gaze_point2 - eye_position
+        # calculate the magnitude of the gaze vectors
+        gaze_vector1_magnitude = np.linalg.norm(gaze_vector1)
+        gaze_vector2_magnitude = np.linalg.norm(gaze_vector2)
+        # calculate the dot product of the gaze vectors
+        dot_product = np.sum(gaze_vector1 * gaze_vector2)
+        # calculate the cosine of the angle between the gaze vectors
+        cosine_theta = dot_product / (gaze_vector1_magnitude * gaze_vector2_magnitude)
+        # calculate the angle between the gaze vectors
+        theta = np.arccos(cosine_theta)
+
+        return np.degrees(theta)
 
     def velocity_classifier(self):
         '''Classify fixations based on velocity threshold'''
@@ -313,7 +401,7 @@ class FixationFilter():
             fixation['average_position_y'] = np.mean(self.pixels_y[start:end+1])
             fixation['average_time'] = np.mean(self.time[start:end+1])
             # we can save more information about the fixation samples´
-        print(self.fixations)
+        print('Initial detected fixations', self.fixations)
         self.merge_fixations()
         self.discard_fixations()
 
@@ -349,7 +437,7 @@ class FixationFilter():
             self.merged_fixations.append({'start': current_fixation_start,
                                             'end': previous_fixation_end,
                                             'duration': self.time[previous_fixation_end] - self.time[current_fixation_start]})
-        print(self.merged_fixations)
+        print('Merged fixations', self.merged_fixations)
 
     def discard_fixations(self):
         '''Discard fixations that are too short, minimum duration of a fixation to keep'''
@@ -370,10 +458,10 @@ class FixationFilter():
             fixation['average_position_x'] = np.mean(self.pixels_x[start:end+1])
             fixation['average_position_y'] = np.mean(self.pixels_y[start:end+1])
             fixation['average_time'] = np.mean(self.time[start:end+1])
-            print(fixation['average_position_x'], fixation['average_position_y'], fixation['average_time'])
+            print('Average values from fixations', fixation['average_position_x'], fixation['average_position_y'], fixation['average_time'])
             
-        print(self.final_fixations)
-        print(self.final_fixation_count)
+        print('Final fixations after discarding short', self.final_fixations)
+        # print(self.final_fixation_count)
         
     def reclassify_fixation(self, start, end):
         '''Reclassify the samples within a fixation that are too short as unknown eye movement'''
@@ -421,12 +509,29 @@ class FixationFilter():
         plt.figure()
         plt.plot(self.time, self.pixels_x, label='Gaze position along the x-axis in pixels', color='b')
         plt.plot(self.time, self.pixels_y, label='Gaze position along the y-axis in pixels', color = 'r')
+        # plt.scatter(self.time, self.pixels_x, label='Gaze position along the x-axis in pixels', marker = 'x', color='b')
+        # plt.scatter(self.time, self.pixels_y, label='Gaze position along the y-axis in pixels', marker = '+', color = 'r')
+
+
         plt.scatter(self.time, self.denoised_pixel_x, label='Denoised gaze position along the x-axis in pixels', marker = 'x', color='c')
         plt.scatter(self.time, self.denoised_pixel_y, label='Denoised gaze position along the y-axis in pixels', marker = '+', color = 'tab:pink')
         plt.legend(fontsize = 6)
         plt.xlabel('Time [s]')
         plt.ylabel('Gaze position')
         plt.grid()
+    
+    def plot_interpolated_pixel_point(self):
+        plt.figure()
+        difference_pixels_x = np.array(self.pixels_x) - np.array(self.interpolated_pixel_x)
+        difference_pixels_y = np.array(self.pixels_y) - np.array(self.interpolated_pixel_y)
+        plt.scatter(self.time, difference_pixels_x, label='Interpolated Gaze position along the x-axis in pixels', marker = 'x', color='b')
+        plt.scatter(self.time, difference_pixels_y, label='Interpolated Gaze position along the y-axis in pixels', marker = '+', color = 'r')
+
+        plt.legend(fontsize = 6)
+        plt.xlabel('Time [s]')
+        plt.ylabel('Gaze position')
+        plt.grid()
+    
     
     def plot_gaze_and_velocity(self):
         plt.figure()
@@ -463,15 +568,17 @@ if __name__ == '__main__':
     input_file = file + '.csv'
     data = pd.read_csv(input_file)
     fixation_filter = FixationFilter(data)
-    fixation_filter.selection('average')
-    fixation_filter.noise_filter('median', window_size = 5)
+    fixation_filter.selection(method = 'average')
+    fixation_filter.noise_filter(method = 'median', alpha = 0.5, window_size = 5)
     fixation_filter.velocity_calculator()
-    fixation_filter.average_velocity_calculator()
+    fixation_filter.fill_in_gaps()
+    # fixation_filter.average_velocity_calculator()
     # fixation_filter.plot_gaze_point()
     # fixation_filter.plot_x_y_gaze_point()
     # fixation_filter.plot_normalized_x_y_gaze_point()
     # fixation_filter.plot_denoised_gaze_point()
     # fixation_filter.plot_denoised_pixel_point()
+    # fixation_filter.plot_interpolated_pixel_point()
     fixation_filter.velocity_classifier()
     fixation_filter.plot_gaze_and_velocity()
     plt.show()
