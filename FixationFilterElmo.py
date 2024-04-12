@@ -4,14 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 class FixationFilter():
-    def __init__(self, data, file, data2, file2):
+    def __init__(self, data):
+        self.data = data
         self.max_time_between_fixations = 0.075 # Komogortsev et al. 2010
         self.max_angle_between_fixations = 0.5 # Komogortsev et al. 2010
         self.fixation_duration_threshold = 0.060 # to remove fixations that are too short Komogortsev et al. 2010
-        self.file = file
-        self.velocity_threshold = 30 # Olsen et al 2012 I-VT fixation filter
-        self.data2 = data2
-        self.file2 = file2
+
+        self.velocity_threshold = 10 # Olsen et al 2012 I-VT fixation filter
 
         self.fixation_count = 0
         self.final_fixation_count = 0
@@ -42,8 +41,8 @@ class FixationFilter():
         self.left_pixels_y = data['LeftGazePoint2DY']*1080
         self.right_pixels_x = data['RightGazePoint2DX']*1920
         self.right_pixels_y = data['RightGazePoint2DY']*1080
-        print(self.left_pixels_x[len(self.left_pixels_x)-1], self.right_pixels_y[len(self.left_pixels_x)-1])
-                
+
+
         self.time_stamp = data['Timestamp']
         
         # Use the system which is the computer time stamp
@@ -64,7 +63,7 @@ class FixationFilter():
 
     def selection(self, method = 'average'):
         if method == 'average' or method == 'strict_average':
-            # calculate the mean while ignoring NaN values
+            # Calculate the mean while ignoring NaN values
             self.gaze_point_x = np.nanmean(np.array([self.left_gaze_point_3dx, self.right_gaze_point_3dx]), axis=0)
             self.gaze_point_y = np.nanmean(np.array([self.left_gaze_point_3dy, self.right_gaze_point_3dy]), axis=0)
             self.gaze_point_z = np.nanmean(np.array([self.left_gaze_point_3dz, self.right_gaze_point_3dz]), axis=0)
@@ -87,11 +86,11 @@ class FixationFilter():
                 self.eye_position_x[~valid_data_mask] = np.nan
                 self.eye_position_y[~valid_data_mask] = np.nan
                 self.eye_position_z[~valid_data_mask] = np.nan
+
                 self.normalized_x[~valid_data_mask] = np.nan
                 self.normalized_y[~valid_data_mask] = np.nan
                 self.pixels_x[~valid_data_mask] = np.nan
                 self.pixels_y[~valid_data_mask] = np.nan
-
         elif method == 'left':
             self.gaze_point_x = self.left_gaze_point_3dx
             self.gaze_point_y = self.left_gaze_point_3dy
@@ -156,6 +155,7 @@ class FixationFilter():
         ema_y = np.nan * np.ones(len(self.gaze_point_y))
         ema_pixel_x = np.nan * np.ones(len(self.pixels_x))
         ema_pixel_y = np.nan * np.ones(len(self.pixels_y))
+        
         for i in range(1, len(self.gaze_point_x)):
             if not np.isnan(self.gaze_point_x[i]):
             # for x-coordinate
@@ -187,7 +187,6 @@ class FixationFilter():
                 self.denoised_gaze_point_y.append(self.gaze_point_y[i])
                 self.denoised_pixel_x.append(self.pixels_x[i])
                 self.denoised_pixel_y.append(self.pixels_y[i])
-
             if i > len(self.gaze_point_x) - half_window:
                 self.denoised_gaze_point_x.append(self.gaze_point_x[i])
                 self.denoised_gaze_point_y.append(self.gaze_point_y[i])
@@ -198,8 +197,6 @@ class FixationFilter():
                 self.denoised_gaze_point_y.append(np.mean(self.gaze_point_y[i-half_window:i+half_window]))
                 self.denoised_pixel_x.append(np.mean(self.pixels_x[i-half_window:i+half_window]))
                 self.denoised_pixel_y.append(np.mean(self.pixels_y[i-half_window:i+half_window]))
-
-        print('shape', len(self.denoised_gaze_point_x), len(self.denoised_gaze_point_y), len(self.denoised_pixel_x), len(self.denoised_pixel_y))
 
     def fill_in_gaps(self, max_gap_length=0.075):
         '''Fill in gaps in the data by interpolating between the two closest points. This is not really necessary'''
@@ -229,8 +226,8 @@ class FixationFilter():
         if gap_start_index is not None:
             self.interpolate_gap(gap_start_index, len(self.pixel), gap_length)
 
-        # print('Interpolated pixel x', self.interpolated_pixel_x)
-        # print('Interpolated pixel y', self.interpolated_pixel_y)
+        print('Interpolated pixel x', self.interpolated_pixel_x)
+        print('Interpolated pixel y', self.interpolated_pixel_y)
 
     def is_valid_sample(self, index):
         # dheck if the sample contains valid gaze data
@@ -561,7 +558,7 @@ class FixationFilter():
             plt.scatter(fixation['average_time'], fixation['average_position_x'], color = 'lime', marker = 'x')
             plt.scatter(fixation['average_time'], fixation['average_position_y'], color = 'indigo', marker = 'x')
             if not label_shown:
-                # show legend outside of plot
+                # show legend outside of plots
                 plt.legend(['Position x-axis', 'Position y-axis', 'Denoised Position y-axis', 'Velocity', 'Velocity Threshold', 'Fixations', 'Average x', 'Average y'], fontsize = 5, loc = 'upper right')
                 label_shown = True
         plt.scatter(self.time, self.denoised_pixel_x, label='Denoised gaze position along the x-axis', marker = 'x', color='c')
@@ -572,23 +569,21 @@ class FixationFilter():
         plt.title('IV-T Filter for fixations')
         plt.grid()
         # save high quality
-        
-        plt.savefig('gaze_and_velocity_plot'+self.file + '.png', dpi = 300)
+        plt.savefig('gaze_and_velocity_with_denoise.png', dpi = 300)
+    
     
 
 if __name__ == '__main__':
-    file_elmo = 'gaze_data_elmo_11-04-15-03.csv'
-    file_screen = 'gaze_data_11-04-15-03.csv'
-    data_elmo = pd.read_csv(file_elmo)
-    data_screen = pd.read_csv(file_screen)
-    
-    fixation_filter = FixationFilter(data_elmo, file_elmo, data_screen, file_screen)
+    file = 'gaze_data_elmo_11-04-15-17'
+    input_file = file + '.csv'
+    data = pd.read_csv(input_file)
+    fixation_filter = FixationFilter(data)
     fixation_filter.selection(method = 'average')
-    fixation_filter.noise_filter(method = 'median', alpha = 0.5, window_size = 5)
+    fixation_filter.noise_filter(method = 'median', alpha = 0.5, window_size = 3)
     fixation_filter.velocity_calculator()
-    fixation_filter.fill_in_gaps()
+    # fixation_filter.fill_in_gaps()
     fixation_filter.average_velocity_calculator()
-    # fixation_filter.plot_gaze_point()
+    fixation_filter.plot_gaze_point()
     fixation_filter.plot_x_y_gaze_point()
     fixation_filter.plot_normalized_x_y_gaze_point()
     fixation_filter.plot_denoised_gaze_point()
