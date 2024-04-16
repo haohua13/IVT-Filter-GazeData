@@ -8,9 +8,8 @@ class FixationFilter():
         self.max_time_between_fixations = 0.075 # Komogortsev et al. 2010
         self.max_angle_between_fixations = 0.5 # Komogortsev et al. 2010
         self.fixation_duration_threshold = 0.060 # to remove fixations that are too short Komogortsev et al. 2010
-        self.file = file
         self.velocity_threshold = 30 # Olsen et al 2012 I-VT fixation filter
-        self.data2 = data2
+        self.file = file
         self.file2 = file2
 
         self.fixation_count = 0
@@ -42,25 +41,122 @@ class FixationFilter():
         self.left_pixels_y = data['LeftGazePoint2DY']*1080
         self.right_pixels_x = data['RightGazePoint2DX']*1920
         self.right_pixels_y = data['RightGazePoint2DY']*1080
-        print(self.left_pixels_x[len(self.left_pixels_x)-1], self.right_pixels_y[len(self.left_pixels_x)-1])
-                
-        self.time_stamp = data['Timestamp']
         
-        # Use the system which is the computer time stamp
-        # self.system_time_stamp = data['SystemTimestamp']
-        # self.time = (self.time_stamp - self.time_stamp[0])/1e6
-
-        # convert to seconds
-        self.time = (self.time_stamp - self.time_stamp[0])/1e6
+        self.time_stamp = data['SystemTimestamp']
         self.left_validity = data['LeftValidity']
         self.right_validity = data['RightValidity']
 
-        self.denoised_gaze_point_x = []
-        self.denoised_gaze_point_y = []
+        self.left_gaze_point_3dx_elmo = data2['LeftGazePoint3DX']
+        self.left_gaze_point_3dy_elmo = data2['LeftGazePoint3DY']
+        self.left_gaze_point_3dz_elmo = data2['LeftGazePoint3DZ']
+        self.right_gaze_point_3dx_elmo = data2['RightGazePoint3DX']
+        self.right_gaze_point_3dy_elmo = data2['RightGazePoint3DY']
+        self.right_gaze_point_3dz_elmo = data2['RightGazePoint3DZ']
+        self.left_eye_position_3dx_elmo = data2['LeftEyePosition3DX']
+        self.left_eye_position_3dy_elmo = data2['LeftEyePosition3DY']
+        self.left_eye_position_3dz_elmo = data2['LeftEyePosition3DZ']
+        self.right_eye_position_3dx_elmo = data2['RightEyePosition3DX']
+        self.right_eye_position_3dy_elmo = data2['RightEyePosition3DY']
+        self.right_eye_position_3dz_elmo = data2['RightEyePosition3DZ']
+        self.left_normalized_x_elmo = data2['LeftGazePoint2DX']
+        self.left_normalized_y_elmo = data2['LeftGazePoint2DY']
+        self.right_normalized_x_elmo = data2['RightGazePoint2DX']
+        self.right_normalized_y_elmo = data2['RightGazePoint2DY']
 
-        self.denoised_pixel_x = []
-        self.denoised_pixel_y = []
+        self.left_pixels_x_elmo = data2['LeftGazePoint2DX']*1920
+        self.left_pixels_y_elmo = data2['LeftGazePoint2DY']*1080
+        self.right_pixels_x_elmo = data2['RightGazePoint2DX']*1920
+        self.right_pixels_y_elmo = data2['RightGazePoint2DY']*1080
 
+        self.time_stamp_elmo = data2['SystemTimestamp']
+        
+        self.time = (self.time_stamp - self.time_stamp[0])/1e6
+        self.time_elmo = (self.time_stamp_elmo - self.time_stamp_elmo[0])/1e6
+        # get last time
+        max_time = max(self.time)
+        max_time_elmo = max(self.time_elmo)
+        difference = abs(max_time - max_time_elmo)
+
+        if max_time_elmo > max_time:
+            self.time = self.time + difference
+        else:
+            self.time_elmo = self.time_elmo + difference
+            
+        print('Max time:', max_time, 'Max time elmo:', max_time_elmo)
+        
+        self.left_validity_elmo = data2['LeftValidity']
+        self.right_validity_elmo = data2['RightValidity']
+        
+        
+    def process_data(self, method = 'average', filter_method = 'moving_average', alpha = 0.5, window_size = 5):
+        '''Process the data by selecting the eye to use, filtering the data and calculating the velocity'''
+        self.selection(method)
+        self.selection_elmo(method)
+        self.denoised_gaze_point_x, self.denoised_gaze_point_y, self.denoised_pixel_x, self.denoised_pixel_y = self.noise_filter(self.gaze_point_x, self.gaze_point_y, self.pixels_x, self.pixels_y, filter_method, alpha, window_size)
+        print(len(self.denoised_gaze_point_x), len(self.denoised_gaze_point_y), len(self.denoised_pixel_x), len(self.denoised_pixel_y))
+        self.denoised_gaze_point_x_elmo, self.denoised_gaze_point_y_elmo, self.denoised_pixel_x_elmo, self.denoised_pixel_y_elmo = self.noise_filter(self.gaze_point_x_elmo, self.gaze_point_y_elmo, self.pixels_x_elmo, self.pixels_y_elmo, filter_method, alpha, window_size)
+        # self.fill_in_gaps()
+        self.velocity_calculator()
+        self.average_velocity_calculator()
+        self.average_velocity_calculator_elmo()
+        self.classifications, self.fixations, self.saccades, self.gaps, self.fixation_count, self.saccades_count, self.gaps_count = self.velocity_classifier(self.velocity, self.time)
+        self.classifications_elmo, self.fixations_elmo, self.saccades_elmo, self.gaps_elmo, self.fixation_count_elmo, self.saccades_count_elmo, self.gaps_count_elmo = self.velocity_classifier(self.velocity_elmo, self.time_elmo)
+        self.process_fixations()
+        
+
+    def selection_elmo(self, method = 'average'):
+        if method == 'average' or method == 'strict_average':
+            # calculate the mean while ignoring NaN values
+            self.gaze_point_x_elmo = np.nanmean(np.array([self.left_gaze_point_3dx_elmo, self.right_gaze_point_3dx_elmo]), axis=0)
+            self.gaze_point_y_elmo = np.nanmean(np.array([self.left_gaze_point_3dy_elmo, self.right_gaze_point_3dy_elmo]), axis=0)
+            self.gaze_point_z_elmo = np.nanmean(np.array([self.left_gaze_point_3dz_elmo, self.right_gaze_point_3dz_elmo]), axis=0)
+            self.eye_position_x_elmo = np.nanmean(np.array([self.left_eye_position_3dx_elmo, self.right_eye_position_3dx_elmo]), axis=0)
+            self.eye_position_y_elmo = np.nanmean(np.array([self.left_eye_position_3dy_elmo, self.right_eye_position_3dy_elmo]), axis=0)
+            self.eye_position_z_elmo = np.nanmean(np.array([self.left_eye_position_3dz_elmo, self.right_eye_position_3dz_elmo]), axis=0)
+            self.normalized_x_elmo = np.nanmean(np.array([self.left_normalized_x_elmo, self.right_normalized_x_elmo]), axis=0)
+            self.normalized_y_elmo = np.nanmean(np.array([self.left_normalized_y_elmo, self.right_normalized_y_elmo]), axis=0)
+            self.pixels_x_elmo = np.nanmean(np.array([self.left_pixels_x_elmo, self.right_pixels_x_elmo]), axis=0)
+            self.pixels_y_elmo = np.nanmean(np.array([self.left_pixels_y_elmo, self.right_pixels_y_elmo]), axis=0)
+
+            if method =='strict_average':
+                # check validity of both eyes
+                valid_data_mask_elmo = (self.left_validity_elmo == 1) & (self.right_validity_elmo == 1)
+                # apply mask to filter out invalid data points
+                self.gaze_point_x_elmo[~valid_data_mask_elmo] = np.nan
+                self.gaze_point_y_elmo[~valid_data_mask_elmo] = np.nan
+                self.gaze_point_z_elmo[~valid_data_mask_elmo] = np.nan
+                self.eye_position_x_elmo[~valid_data_mask_elmo] = np.nan
+                self.eye_position_y_elmo[~valid_data_mask_elmo] = np.nan
+                self.eye_position_z_elmo[~valid_data_mask_elmo] = np.nan
+                self.normalized_x_elmo[~valid_data_mask_elmo] = np.nan
+                self.normalized_y_elmo[~valid_data_mask_elmo] = np.nan
+                self.pixels_x_elmo[~valid_data_mask_elmo] = np.nan
+                self.pixels_y_elmo[~valid_data_mask_elmo] = np.nan
+
+            elif method == 'left':
+                self.gaze_point_x_elmo = self.left_gaze_point_3dx_elmo
+                self.gaze_point_y_elmo = self.left_gaze_point_3dy_elmo
+                self.gaze_point_z_elmo = self.left_gaze_point_3dz_elmo
+                self.eye_position_x_elmo = self.left_eye_position_3dx_elmo
+                self.eye_position_y_elmo = self.left_eye_position_3dy_elmo
+                self.eye_position_z_elmo = self.left_eye_position_3dz_elmo
+                self.normalized_x_elmo = self.left_normalized_x_elmo
+                self.normalized_y_elmo = self.left_normalized_y_elmo
+                self.pixels_x_elmo = self.left_pixels_x_elmo
+                self.pixels_y_elmo = self.left_pixels_y_elmo
+
+            elif method == 'right':
+                self.gaze_point_x_elmo = self.right_gaze_point_3dx_elmo
+                self.gaze_point_y_elmo = self.right_gaze_point_3dy_elmo
+                self.gaze_point_z_elmo = self.right_gaze_point_3dz_elmo
+                self.eye_position_x_elmo = self.right_eye_position_3dx_elmo
+                self.eye_position_y_elmo = self.right_eye_position_3dy_elmo
+                self.eye_position_z_elmo = self.right_eye_position_3dz_elmo
+                self.normalized_x_elmo = self.right_normalized_x_elmo
+                self.normalized_y_elmo = self.right_normalized_y_elmo
+                self.pixels_x_elmo = self.right_pixels_x_elmo
+                self.pixels_y_elmo = self.right_pixels_y_elmo
+            
 
     def selection(self, method = 'average'):
         if method == 'average' or method == 'strict_average':
@@ -71,7 +167,6 @@ class FixationFilter():
             self.eye_position_x = np.nanmean(np.array([self.left_eye_position_3dx, self.right_eye_position_3dx]), axis=0)
             self.eye_position_y = np.nanmean(np.array([self.left_eye_position_3dy, self.right_eye_position_3dy]), axis=0)
             self.eye_position_z = np.nanmean(np.array([self.left_eye_position_3dz, self.right_eye_position_3dz]), axis=0)
-
             self.normalized_x = np.nanmean(np.array([self.left_normalized_x, self.right_normalized_x]), axis=0)
             self.normalized_y = np.nanmean(np.array([self.left_normalized_y, self.right_normalized_y]), axis=0)
             self.pixels_x = np.nanmean(np.array([self.left_pixels_x, self.right_pixels_x]), axis=0)
@@ -80,6 +175,7 @@ class FixationFilter():
             if method =='strict_average':
                 # check validity of both eyes
                 valid_data_mask = (self.left_validity == 1) & (self.right_validity == 1)
+                valid_data_mask_elmo = (self.left_validity_elmo == 1) & (self.right_validity_elmo == 1)
                 # apply mask to filter out invalid data points
                 self.gaze_point_x[~valid_data_mask] = np.nan
                 self.gaze_point_y[~valid_data_mask] = np.nan
@@ -116,9 +212,18 @@ class FixationFilter():
             self.pixels_x = self.right_pixels_x
             self.pixels_y = self.right_pixels_y
 
-    def noise_filter(self, method ='moving_average', alpha=0.5, window_size=4):
+
+    def noise_filter(self, x, y, pixel_x, pixel_y, method ='moving_average', alpha=0.5, window_size=4):
         '''Remove noise from the data by applying a low-pass filter
         Parameters:
+        gaze_point_x: list
+            The x-coordinate of the gaze point
+        gaze_point_y: list
+            The y-coordinate of the gaze point
+        pixels_x: list
+            The x-coordinate of the gaze point in pixels
+        pixels_y: list
+            The y-coordinate of the gaze point in pixels
         method: str
             The method used to filter the data. Options are 'median', 'exponential_moving_average', 'moving_average'
         alpha: float
@@ -129,77 +234,81 @@ class FixationFilter():
             Larger window size, the more smoothed out the data will be. Velocity threshold should be lower.
         '''
         if method == 'median':
-            return self.median_filter(window_size)
+            return self.median_filter(x, y, pixel_x, pixel_y, window_size)
         elif method =='exponential_moving_average':
-            return self.exponential_moving_average(alpha)
+            return self.exponential_moving_average(x, y, pixel_x, pixel_y, alpha)
         elif method == 'moving_average':
-            return self.moving_average(window_size)
-
-    def median_filter(self, window_size):
+            return self.moving_average(x, y, pixel_x, pixel_y, window_size)
+        
+    def median_filter(self, x, y, pixel_x, pixel_y, window_size):
         half_window = window_size // 2 
+        denoised_gaze_point_x = []
+        denoised_gaze_point_y = []
+        denoised_pixel_x = []
+        denoised_pixel_y = []
         # has to be not odd number
-        for i in range(len(self.gaze_point_x)):
-            if i < half_window or i > len(self.gaze_point_x) - half_window:
-                self.denoised_gaze_point_x.append(self.gaze_point_x[i])
-                self.denoised_gaze_point_y.append(self.gaze_point_y[i])
-                self.denoised_pixel_x.append(self.pixels_x[i])
-                self.denoised_pixel_y.append(self.pixels_y[i])
+        for i in range(len(x)):
+            if i < half_window or i > len(x) - half_window:
+                denoised_gaze_point_x.append(x[i])
+                denoised_gaze_point_y.append(y[i])
+                denoised_pixel_x.append(pixel_x[i])
+                denoised_pixel_y.append(pixel_y[i])
             else:
-                self.denoised_gaze_point_x.append(np.median(self.gaze_point_x[i-half_window:i+half_window]))
-                self.denoised_gaze_point_y.append(np.median(self.gaze_point_y[i-half_window:i+half_window]))
-                self.denoised_pixel_x.append(np.median(self.pixels_x[i-half_window:i+half_window]))
-                self.denoised_pixel_y.append(np.median(self.pixels_y[i-half_window:i+half_window]))
+                denoised_gaze_point_x.append(np.median(x[i-half_window:i+half_window]))
+                denoised_gaze_point_y.append(np.median(y[i-half_window:i+half_window]))
+                denoised_pixel_x.append(np.median(pixel_x[i-half_window:i+half_window]))
+                denoised_pixel_y.append(np.median(pixel_y[i-half_window:i+half_window]))
+        print(len(denoised_gaze_point_x), len(denoised_gaze_point_y), len(denoised_pixel_x), len(denoised_pixel_y))
 
-    def exponential_moving_average(self, alpha):
+        return denoised_gaze_point_x, denoised_gaze_point_y, denoised_pixel_x, denoised_pixel_y
+
+    def exponential_moving_average(self, x, y, pixel_x, pixel_y, alpha):
+        '''Apply an exponential moving average to the data'''
         # sf = 2 / (window_size + 1)
-        ema_x = np.nan * np.ones(len(self.gaze_point_x))
-        ema_y = np.nan * np.ones(len(self.gaze_point_y))
-        ema_pixel_x = np.nan * np.ones(len(self.pixels_x))
-        ema_pixel_y = np.nan * np.ones(len(self.pixels_y))
-        for i in range(1, len(self.gaze_point_x)):
-            if not np.isnan(self.gaze_point_x[i]):
+        ema_x = np.nan * np.ones(len(x))
+        ema_y = np.nan * np.ones(len(y))
+        ema_pixel_x = np.nan * np.ones(len(pixel_x))
+        ema_pixel_y = np.nan * np.ones(len(pixel_y))
+        for i in range(1, len(x)):
+            if not np.isnan(x[i]):
             # for x-coordinate
                 if np.isnan(ema_x[i-1]):
-                    ema_x[i] = self.gaze_point_x[i]
-                    ema_pixel_x[i] = self.pixels_x[i]
+                    ema_x[i] = x[i]
+                    ema_pixel_x[i] = pixel_x[i]
                 else:
-                    ema_x[i] = (alpha * self.gaze_point_x[i]) + ((1 - alpha) * ema_x[i-1])      
-                    ema_pixel_x[i] = (alpha * self.pixels_x[i]) + ((1 - alpha) * ema_pixel_x[i-1]) 
+                    ema_x[i] = (alpha * x[i]) + ((1 - alpha) * ema_x[i-1])      
+                    ema_pixel_x[i] = (alpha * pixel_x[i]) + ((1 - alpha) * ema_pixel_x[i-1]) 
             # for y-coordiante
-            if not np.isnan(self.gaze_point_y[i]):
+            if not np.isnan(y[i]):
                 if np.isnan(ema_y[i-1]):
-                    ema_y[i] = self.gaze_point_y[i]
-                    ema_pixel_y[i] = self.pixels_y[i]
+                    ema_y[i] = y[i]
+                    ema_pixel_y[i] = pixel_y[i]
                 else:
-                    ema_y[i] = (alpha * self.gaze_point_y[i]) + ((1 - alpha) * ema_y[i-1])
-                    ema_pixel_y[i] = (alpha * self.pixels_y[i]) + ((1 - alpha) * ema_pixel_y[i-1])
+                    ema_y[i] = (alpha * y[i]) + ((1 - alpha) * ema_y[i-1])
+                    ema_pixel_y[i] = (alpha * pixel_y[i]) + ((1 - alpha) * ema_pixel_y[i-1])
 
-        self.denoised_gaze_point_x = ema_x
-        self.denoised_gaze_point_y = ema_y
-        self.denoised_pixel_x = ema_pixel_x
-        self.denoised_pixel_y = ema_pixel_y
+        return ema_x, ema_y, ema_pixel_x, ema_pixel_y
 
-    def moving_average(self, window_size):
+    def moving_average(self, x, y, pixel_x, pixel_y, window_size):
         half_window = window_size // 2
-        for i in range(len(self.gaze_point_x)-1):
-            if i < half_window:
-                self.denoised_gaze_point_x.append(self.gaze_point_x[i])
-                self.denoised_gaze_point_y.append(self.gaze_point_y[i])
-                self.denoised_pixel_x.append(self.pixels_x[i])
-                self.denoised_pixel_y.append(self.pixels_y[i])
-
-            if i > len(self.gaze_point_x) - half_window:
-                self.denoised_gaze_point_x.append(self.gaze_point_x[i])
-                self.denoised_gaze_point_y.append(self.gaze_point_y[i])
-                self.denoised_pixel_x.append(self.pixels_x[i])
-                self.denoised_pixel_y.append(self.pixels_y[i])
+        denoised_gaze_point_x = []
+        denoised_gaze_point_y = []
+        denoised_pixel_x = []
+        denoised_pixel_y = []
+        for i in range(len(x)):
+            if i < half_window or i > len(x) - half_window:
+                denoised_gaze_point_x.append(x[i])
+                denoised_gaze_point_y.append(y[i])
+                denoised_pixel_x.append(pixel_x[i])
+                denoised_pixel_y.append(pixel_y[i])
             else:
-                self.denoised_gaze_point_x.append(np.mean(self.gaze_point_x[i-half_window:i+half_window]))
-                self.denoised_gaze_point_y.append(np.mean(self.gaze_point_y[i-half_window:i+half_window]))
-                self.denoised_pixel_x.append(np.mean(self.pixels_x[i-half_window:i+half_window]))
-                self.denoised_pixel_y.append(np.mean(self.pixels_y[i-half_window:i+half_window]))
+                denoised_gaze_point_x.append(np.mean(x[i-half_window:i+half_window]))
+                denoised_gaze_point_y.append(np.mean(y[i-half_window:i+half_window]))
+                denoised_pixel_x.append(np.mean(pixel_x[i-half_window:i+half_window]))
+                denoised_pixel_y.append(np.mean(pixel_y[i-half_window:i+half_window]))
 
-        print('shape', len(self.denoised_gaze_point_x), len(self.denoised_gaze_point_y), len(self.denoised_pixel_x), len(self.denoised_pixel_y))
+        return denoised_gaze_point_x, denoised_gaze_point_y, denoised_pixel_x, denoised_pixel_y
+
 
     def fill_in_gaps(self, max_gap_length=0.075):
         '''Fill in gaps in the data by interpolating between the two closest points. This is not really necessary'''
@@ -258,7 +367,7 @@ class FixationFilter():
 
     def velocity_calculator(self):
         '''Calculates the velocity as the rate of change of the angle between the gaze vector and the eye position vector. In degrees per second.'''
-        # calculate velocity
+        # calculate velocity for data 1
         eye_positions = np.column_stack((self.eye_position_x, self.eye_position_y, self.eye_position_z))
         gaze_positions = np.column_stack((self.gaze_point_x, self.gaze_point_y, self.gaze_point_z))
         # calculate the magnitude of the eye position
@@ -273,6 +382,16 @@ class FixationFilter():
         cosine_theta = dot_product / (eye_position_magnitude * gaze_vector_magnitude)
         self.theta = np.degrees(np.arccos(cosine_theta))
         self.velocity = np.gradient(self.theta, self.time)
+
+        eye_positions_elmo = np.column_stack((self.eye_position_x_elmo, self.eye_position_y_elmo, self.eye_position_z_elmo))
+        gaze_positions_elmo = np.column_stack((self.gaze_point_x_elmo, self.gaze_point_y_elmo, self.gaze_point_z_elmo))
+        eye_position_magnitude_elmo = np.linalg.norm(eye_positions_elmo, axis=1)
+        gaze_vectors_elmo = gaze_positions_elmo - eye_positions_elmo
+        gaze_vector_magnitude_elmo = np.linalg.norm(gaze_vectors_elmo, axis=1)
+        dot_product_elmo = np.sum(gaze_vectors_elmo * eye_positions_elmo, axis=1)
+        cosine_theta_elmo = dot_product_elmo / (eye_position_magnitude_elmo * gaze_vector_magnitude_elmo)
+        self.theta_elmo = np.degrees(np.arccos(cosine_theta_elmo))
+        self.velocity_elmo = np.gradient(self.theta_elmo, self.time_elmo)
 
     def average_velocity_calculator(self, window_length=0.020):
         self.average_velocity = []
@@ -296,7 +415,6 @@ class FixationFilter():
 
                 # calculate time difference between first and last samples
                 time_difference = self.time[end_index] - self.time[start_index]
-
                 # calculate velocity
                 velocity = angle / time_difference
                 self.average_theta.append(angle)
@@ -304,9 +422,36 @@ class FixationFilter():
             else:
                 self.average_velocity.append(np.nan)
                 self.average_theta.append(np.nan)
-        
-        # print('average velocity', self.average_velocity)
-        # print('average theta', self.average_theta)
+
+    def average_velocity_calculator_elmo (self, window_length=0.020):
+        self.average_velocity_elmo = []
+        self.average_theta_elmo = []
+        # number of samples in window length
+        window_size = int(window_length / np.mean(np.diff(self.time_elmo)))
+        # calculate the average velocity
+        for i in range(len(self.gaze_point_x_elmo)):
+            # Determine start and end indices of the window
+            start_index = max(0, i - window_size // 2)
+            end_index = min(len(self.gaze_point_x_elmo) - 1, i + window_size // 2)
+            if end_index - start_index + 1 >= 2:
+                # extract relevant gaze point and eye position data
+                gaze_positions_window = np.column_stack((self.gaze_point_x_elmo[start_index:end_index+1],
+                                                          self.gaze_point_y_elmo[start_index:end_index+1],
+                                                          self.gaze_point_z_elmo[start_index:end_index+1]))
+                eye_position = np.array([self.eye_position_x_elmo[i], self.eye_position_y_elmo[i], self.eye_position_z_elmo[i]])
+
+                # calculate visual angle between first and last samples
+                angle = self.calculate_visual_angle(gaze_positions_window[0], gaze_positions_window[-1], eye_position)
+
+                # calculate time difference between first and last samples
+                time_difference = self.time_elmo[end_index] - self.time_elmo[start_index]
+                # calculate velocity
+                velocity = angle / time_difference
+                self.average_theta_elmo.append(angle)
+                self.average_velocity_elmo.append(velocity)
+            else:
+                self.average_velocity_elmo.append(np.nan)
+                self.average_theta_elmo.append(np.nan)
 
     def calculate_visual_angle(gaze_point1, gaze_point2, eye_position):
         '''Calculate the visual angle between two gaze points and the eye position'''
@@ -322,84 +467,110 @@ class FixationFilter():
         cosine_theta = dot_product / (gaze_vector1_magnitude * gaze_vector2_magnitude)
         # calculate the angle between the gaze vectors
         theta = np.arccos(cosine_theta)
-
         return np.degrees(theta)
 
-    def velocity_classifier(self):
+    def velocity_classifier(self, velocity, time):
         '''Classify fixations based on velocity threshold'''
-        self.classifications = np.full(len(self.velocity), np.nan)
+        classifications = np.full(len(velocity), np.nan)
+        fixations = []
+        fixation_count = 0
+        saccades = []
+        saccade_count = 0
+        gaps = []
+        gap_count = 0
         start_fixation = None
         start_saccade = None
         start_gap = None
-        for i in range(len(self.velocity)):
-            if not(np.isnan(self.velocity[i])):
-                if abs(self.velocity[i]) < self.velocity_threshold:
-                    self.classifications[i] = 1 # fixation = 1
+        for i in range(len(velocity)):
+            if not(np.isnan(velocity[i])):
+                if abs(velocity[i]) < self.velocity_threshold:
+                    classifications[i] = 1 # fixation = 1
                     if start_fixation is None:
                         start_fixation = i # start of a fixation
                     # if start_saccade or start_gap is not None, record them, as they are ended by a fixation
                     if start_saccade is not None:
-                        saccade_duration = self.time[i] - self.time[start_saccade]
-                        self.record_saccade(start_saccade, i, saccade_duration)
+                        saccade_duration = time[i] - time[start_saccade]
+                        saccade = self.record_saccade(start_saccade, i, saccade_duration)
+                        saccades.append(saccade)
+                        saccade_count += 1
+
                         start_saccade = None
                     if start_gap is not None:
-                        gap_duration = self.time[i] - self.time[start_gap]
-                        self.record_gap(start_gap, i, gap_duration)
+                        gap_duration = time[i] - time[start_gap]
+                        gap = self.record_gap(start_gap, i, gap_duration)
+                        gaps.append(gap)
+                        saccade_count += 1
                         start_gap = None
                     
                 else:
-                    self.classifications[i] = 0 # saccade = 0
+                    classifications[i] = 0 # saccade = 0
                     if start_saccade is None:
                         start_saccade = i
                     # if start_fixation or start_gap is not None, record them, as they are ended by a saccade
                     if start_fixation is not None: # end of a fixation
-                        fixation_duration = self.time[i] - self.time[start_fixation]
-                        self.record_fixation(start_fixation, i, fixation_duration)
+                        fixation_duration = time[i] - time[start_fixation]
+                        fixation = self.record_fixation(start_fixation, i, fixation_duration)
+                        fixations.append(fixation)
+                        fixation_count += 1
                         start_fixation = None
                     if start_gap is not None:
-                        gap_duration = self.time[i] - self.time[start_gap]
-                        self.record_gap(start_gap, i, gap_duration)
+                        gap_duration = time[i] - time[start_gap]
+                        gap = self.record_gap(start_gap, i, gap_duration)
+                        gaps.append(gap)
+                        gap_count += 1
                         start_gap = None
             # if classification is nan, samples are within a gap or beginning or end of the data
             else:
                 if start_gap is None:
                     start_gap = i
                 if start_fixation is not None:
-                    fixation_duration = self.time[i] - self.time[start_fixation]
-                    self.record_fixation(start_fixation, i, fixation_duration)
+                    fixation_duration = time[i] - time[start_fixation]
+                    fixation = self.record_fixation(start_fixation, i, fixation_duration)
+                    fixations.append(fixation)
+                    fixation_count += 1
                     start_fixation = None
                 if start_saccade is not None:
-                    saccade_duration = self.time[i] - self.time[start_saccade]
-                    self.record_saccade(start_saccade, i, saccade_duration)
+                    saccade_duration = time[i] - time[start_saccade]
+                    saccade = self.record_saccade(start_saccade, i, saccade_duration)
+                    saccades.append(saccade)
+                    saccade_count += 1
                     start_saccade = None
 
         # check if any ongoing fixations, saccades or gaps extend to the end of the data
         if start_fixation is not None:
-            fixation_duration = self.time[i] - self.time[start_fixation]
-            self.record_fixation(start_fixation, len(self.velocity)-1, fixation_duration)
+            fixation_duration = time[i] - time[start_fixation]
+            fixation = self.record_fixation(start_fixation, len(velocity)-1, fixation_duration)
+            fixations.append(fixation)
+            fixation_count +=1
+
+    
         if start_saccade is not None:
-            saccade_duration = self.time[i] - self.time[start_saccade]
-            self.record_saccade(start_saccade, len(self.velocity)-1, saccade_duration)
+            saccade_duration = time[i] - time[start_saccade]
+            saccade = self.record_saccade(start_saccade, len(velocity)-1, saccade_duration)
+            saccades.append(saccade)
+            saccade_count += 1
         if start_gap is not None:
-            gap_duration = self.time[i] - self.time[start_gap]
-            self.record_gap(start_gap, len(self.velocity)-1, gap_duration)
-        # obtain data of fixations
-        self.process_fixations()
+            gap_duration = time[i] - time[start_gap]
+            gap = self.record_gap(start_gap, len(velocity)-1, gap_duration)
+            gaps.append(gap)
+            gap_count += 1
+    
+        return classifications, fixations, saccades, gaps, fixation_count, saccade_count, gap_count
 
     def record_fixation(self, start, end, duration):
         '''Record the start and end of a fixation'''
         fixation = {'start': start, 'end': end, 'duration': duration}
-        self.fixations.append(fixation)
-        self.fixation_count += 1 # total number of fixations
+        return fixation
+
     def record_saccade(self, start, end, duration):
         '''Record the start and end of a saccade'''
         saccade = {'start': start, 'end': end, 'duration': duration}
-        self.saccades.append(saccade)
+        return saccade
 
     def record_gap(self, start, end, duration):
         '''Record the start and end of a gap'''
         gap = {'start': start, 'end': end, 'duration': duration}
-        self.gaps.append(gap)
+        return gap
     
     def process_fixations(self):
         # obtain the average position of the gaze point during the fixation
@@ -411,82 +582,81 @@ class FixationFilter():
             fixation['average_position_y'] = np.mean(self.pixels_y[start:end+1])
             fixation['average_time'] = np.mean(self.time[start:end+1])
             # we can save more information about the fixation samples´
-        print('Initial detected fixations', self.fixations)
-        self.merge_fixations()
-        self.discard_fixations()
+        # print('Initial detected fixations', self.fixations)
 
-    def merge_fixations(self):
-        '''Merge fixations that are close to each other, minimum time and angle between fixations'''
-        self.merged_fixations = []
-        current_fixation_start = None # beginning of the current fixation
-        previous_fixation_end = None # end of the previous fixation
-        for fixation in self.fixations:
-            start = fixation['start']
-            end = fixation['end']
-            if current_fixation_start is None: # first fixation
-                current_fixation_start = start
-                previous_fixation_end = end
-            else:
-                # time difference between fixations
-                time_between_fixations = self.time[start] - self.time[previous_fixation_end]
-                # angle difference between fixations (theta)
-                angle_between_fixations = self.theta[start] - self.theta[previous_fixation_end]
-                print(time_between_fixations, angle_between_fixations)
-                if time_between_fixations < self.max_time_between_fixations and abs(angle_between_fixations) < self.max_angle_between_fixations:
-                    # merge fixations
-                    previous_fixation_end = end
-                else:
-                    self.merged_fixations.append({'start': current_fixation_start, 
-                                                  'end': previous_fixation_end, 
-                                                  'duration': self.time[previous_fixation_end] - self.time[current_fixation_start]})
-                    # start of the new merged fixation
-                    current_fixation_start = start
-                    previous_fixation_end = end
-        # add the last fixation
-        if current_fixation_start is not None:
-            self.merged_fixations.append({'start': current_fixation_start,
-                                            'end': previous_fixation_end,
-                                            'duration': self.time[previous_fixation_end] - self.time[current_fixation_start]})
-        print('Merged fixations', self.merged_fixations)
-
-    def discard_fixations(self):
-        '''Discard fixations that are too short, minimum duration of a fixation to keep'''
-        self.final_fixations = []
-        for fixation in self.merged_fixations:
-            start = fixation['start']
-            end = fixation['end']
-            if fixation['duration'] >= self.fixation_duration_threshold:
-                self.final_fixations.append(fixation)
-                self.final_fixation_count += 1
-            else:
-                self.reclassify_fixation(start, end)
-        # obtain average position of the gaze point during the final fixations
-        for fixation in self.final_fixations:
+        for fixation in self.fixations_elmo:
             start = fixation['start']
             end = fixation['end']
             # calculate the mean of the gaze point during the fixation [in pixels]
-            fixation['average_position_x'] = np.mean(self.pixels_x[start:end+1])
-            fixation['average_position_y'] = np.mean(self.pixels_y[start:end+1])
-            fixation['average_time'] = np.mean(self.time[start:end+1])
-            print('Average values from fixations', fixation['average_position_x'], fixation['average_position_y'], fixation['average_time'])
-            
-        print('Final fixations after discarding short', self.final_fixations)
-        # print(self.final_fixation_count)
+            fixation['average_position_x'] = np.mean(self.pixels_x_elmo[start:end+1])
+            fixation['average_position_y'] = np.mean(self.pixels_y_elmo[start:end+1])
+            fixation['average_time'] = np.mean(self.time_elmo[start:end+1])
+            # we can save more information about the fixation samples´
+
+        self.merged_fixations = self.merge_fixations(self.fixations, self.time, self.theta)
+        self.merged_fixations_elmo = self.merge_fixations(self.fixations_elmo, self.time_elmo, self.theta_elmo)
+
+        self.final_fixations, self.final_fixation_count = self.discard_fixations(self.merged_fixations, self.classifications, self.pixels_x, self.pixels_y, self.time)
+        self.final_fixations_elmo, self.final_fixation_count_elmo = self.discard_fixations(self.merged_fixations_elmo, self.classifications_elmo, self.pixels_x_elmo, self.pixels_y_elmo, self.time_elmo)
+
+    def merge_fixations(self, fixations, time, theta):
+        '''Merge fixations that are close to each other, minimum time and angle between fixations'''
+        merged_fixations = []
+        current_fixation_start = None
+        previous_fixation_end = None
+        for fixation in fixations:
+            start = fixation['start']
+            end = fixation['end']
+            if current_fixation_start is None:
+                current_fixation_start = start
+                previous_fixation_end = end
+            else:
+                time_between_fixations = time[start] - time[previous_fixation_end]
+                angle_between_fixations = theta[start] - theta[previous_fixation_end]
+                if time_between_fixations < self.max_time_between_fixations and abs(angle_between_fixations) < self.max_angle_between_fixations:
+                    previous_fixation_end = end
+                else:
+                    merged_fixations.append({'start': current_fixation_start, 
+                                             'end': previous_fixation_end, 
+                                             'duration': time[previous_fixation_end] - time[current_fixation_start]})
+                    current_fixation_start = start
+                    previous_fixation_end = end
+
+        if current_fixation_start is not None:
+            merged_fixations.append({'start': current_fixation_start,
+                                     'end': previous_fixation_end,
+                                     'duration': time[previous_fixation_end] - time[current_fixation_start]})
+        return merged_fixations
+    
+    def discard_fixations(self, merged_fixations, classification, pixels_x, pixels_y, time):
+        '''Discard fixations that are too short, minimum duration of a fixation to keep'''
+        final_fixations = []
+        final_fixation_count = 0
+        for fixation in merged_fixations:
+            start = fixation['start']
+            end = fixation['end']
+            if fixation['duration'] >= self.fixation_duration_threshold:
+                final_fixations.append(fixation)
+                final_fixation_count += 1
+            else:
+                self.reclassify_fixation(classification, start, end)
+        # obtain average position of the gaze point during the final fixations
+        for fixation in final_fixations:
+            start = fixation['start']
+            end = fixation['end']
+            # calculate the mean of the gaze point during the fixation [in pixels]
+            fixation['average_position_x'] = np.mean(pixels_x[start:end+1])
+            fixation['average_position_y'] = np.mean(pixels_y[start:end+1])
+            fixation['average_time'] = np.mean(time[start:end+1])
+            # print('Average values from fixations', fixation['average_position_x'], fixation['average_position_y'], fixation['average_time'])  
+        # print('Final fixations after discarding short', final_fixations)
+        # print(final_fixation_count)
+        return final_fixations, final_fixation_count
         
-    def reclassify_fixation(self, start, end):
+    def reclassify_fixation(self, classification, start, end):
         '''Reclassify the samples within a fixation that are too short as unknown eye movement'''
         for i in range(start, end+1):
-            self.classifications[i] = -1 # unknown eye movement = -1
-    
-    def plot_gaze_point(self):
-        plt.figure()
-        
-        plt.plot(self.time, self.gaze_point_x, label='Gaze position along the x-axis', color='b')
-        plt.plot(self.time, self.gaze_point_y, label='Gaze position along the y-axis', color = 'r')
-        plt.legend(fontsize = 6)
-        plt.xlabel('Time [s]')
-        plt.ylabel('Gaze position in [mm]')
-        plt.grid()
+            classification[i] = 0
     
     def plot_normalized_x_y_gaze_point(self):
         plt.figure()
@@ -573,8 +743,39 @@ class FixationFilter():
         plt.grid()
         # save high quality
         
-        plt.savefig('gaze_and_velocity_plot'+self.file + '.png', dpi = 300)
-    
+        plt.savefig('images/gaze_and_velocity_plot'+self.file + '.png', dpi = 300)
+
+    def plot_gaze_and_velocity_elmo(self):
+        plt.figure()
+        plt.plot(self.time_elmo, self.pixels_x_elmo, label='Gaze position along the x-axis', color='b')
+        plt.plot(self.time_elmo, -np.ones(len(self.time_elmo)) * self.velocity_threshold, color = 'k', linestyle = '--')
+        plt.plot(self.time_elmo, self.pixels_y_elmo, label='Gaze position along the y-axis', color = 'r')
+        # plt.plot(self.time, self.normalized_y, label='Gaze position along the y-axis', color = 'r')
+        plt.plot(self.time_elmo, self.velocity_elmo, label='Velocity', color = 'g')
+        plt.plot(self.time_elmo, np.ones(len(self.time_elmo)) * self.velocity_threshold, label='Velocity Threshold', color = 'k', linestyle = '--')
+
+        # draw the final fixations
+        label_shown = False
+        for fixation in self.final_fixations_elmo:
+            # show fixation zones and average positions
+            plt.axvspan(self.time_elmo[fixation['start']], self.time_elmo[fixation['end']], color = 'tab:gray', alpha = 0.5)
+            # how to put scatter on top of plot
+            plt.scatter(fixation['average_time'], fixation['average_position_x'], color = 'lime', marker = 'x')
+            plt.scatter(fixation['average_time'], fixation['average_position_y'], color = 'indigo', marker = 'x')
+            if not label_shown:
+                # show legend outside of plot
+                plt.legend(['Position x-axis', 'Position y-axis', 'Denoised Position y-axis', 'Velocity', 'Velocity Threshold', 'Fixations', 'Average x', 'Average y'], fontsize = 5, loc = 'upper right')
+                label_shown = True
+        plt.scatter(self.time_elmo, self.denoised_pixel_x_elmo, label='Denoised gaze position along the x-axis', marker = 'x', color='c')
+        plt.scatter(self.time_elmo, self.denoised_pixel_y_elmo, label='Denoised gaze position along the y-axis', marker = '+', color = 'tab:pink')
+        plt.xlabel('Time [s]')
+        # print(self.time)
+        plt.ylabel('Gaze position [pixels] and velocity [deg/s]')
+        plt.title('IV-T Filter for fixations Elmo')
+        plt.grid()
+        # save high quality
+        plt.savefig('images/gaze_and_velocity_plot_elmo'+self.file2 + '.png', dpi = 300)
+
 
 if __name__ == '__main__':
     file_elmo = 'gaze_data_elmo_11-04-15-03.csv'
@@ -582,19 +783,14 @@ if __name__ == '__main__':
     data_elmo = pd.read_csv(file_elmo)
     data_screen = pd.read_csv(file_screen)
     
-    fixation_filter = FixationFilter(data_elmo, file_elmo, data_screen, file_screen)
-    fixation_filter.selection(method = 'average')
-    fixation_filter.noise_filter(method = 'median', alpha = 0.5, window_size = 5)
-    fixation_filter.velocity_calculator()
-    fixation_filter.fill_in_gaps()
-    fixation_filter.average_velocity_calculator()
-    # fixation_filter.plot_gaze_point()
+    fixation_filter = FixationFilter(data_screen, file_screen, data_elmo, file_elmo)
+    fixation_filter.process_data()
     fixation_filter.plot_x_y_gaze_point()
     fixation_filter.plot_normalized_x_y_gaze_point()
     fixation_filter.plot_denoised_gaze_point()
     fixation_filter.plot_denoised_pixel_point()
     # fixation_filter.plot_interpolated_pixel_point()
-    fixation_filter.velocity_classifier()
     fixation_filter.plot_gaze_and_velocity()
+    fixation_filter.plot_gaze_and_velocity_elmo()
     plt.show()
 

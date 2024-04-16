@@ -181,7 +181,7 @@ class FixationFilter():
 
     def moving_average(self, window_size):
         half_window = window_size // 2
-        for i in range(len(self.gaze_point_x)-1):
+        for i in range(len(self.gaze_point_x)):
             if i < half_window:
                 self.denoised_gaze_point_x.append(self.gaze_point_x[i])
                 self.denoised_gaze_point_y.append(self.gaze_point_y[i])
@@ -570,7 +570,6 @@ class FixationFilter():
         plt.grid()
         # save high quality
         plt.savefig('gaze_and_velocity_with_denoise.png', dpi = 300)
-    
     
 
 if __name__ == '__main__':
