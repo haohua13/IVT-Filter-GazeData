@@ -4,7 +4,7 @@ import keyboard
 import csv
 from datetime import datetime
 from pygame.locals import QUIT
-
+import sys
 # find Tobii eye trackers
 found_eyetrackers = tr.find_all_eyetrackers()
 my_eyetracker = found_eyetrackers[0]
@@ -60,10 +60,10 @@ left_pupil_validity = []
 
 computer_timestamps = []
 
-def write_all_data_to_file():
+def write_all_data_to_file(filename):
         current_time = datetime.now()
         time_format = current_time.strftime("%d-%m-%H-%M")
-        csv_file_name = "gaze_data/gaze_data_" + time_format + ".csv"
+        csv_file_name = "gaze_data/" + filename + time_format + ".csv"
         with open(csv_file_name, 'a', newline='') as csv_file:
             csv_writer = csv.writer(csv_file)
             if csv_file.tell() == 0:
@@ -168,6 +168,13 @@ def gaze_data_callback(gaze_data):
 
 if __name__ == "__main__":
     # start data collection
+    args = sys.argv
+    if len(args) > 1:
+        if args[1] == "elmo":
+             filename = "gaze_data_elmo_"
+    else:
+        filename = "gaze_data_"
+
     print("Subscribing to data for eye tracker with serial number {0}.".format(my_eyetracker.serial_number))
     time.sleep(3)
     # my_eyetracker.subscribe_to(tr.EYETRACKER_USER_POSITION_GUIDE, user_position_guide_callback, as_dictionary=True)
@@ -175,6 +182,6 @@ if __name__ == "__main__":
 
     while True:
         if keyboard.is_pressed('w'): # press w keyboard to stop the recording
-            write_all_data_to_file()
+            write_all_data_to_file(filename)
             break
     my_eyetracker.unsubscribe_from(tr.EYETRACKER_GAZE_DATA, gaze_data_callback)
