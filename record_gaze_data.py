@@ -169,12 +169,12 @@ def gaze_data_callback(gaze_data):
 if __name__ == "__main__":
     # start data collection
     args = sys.argv
+    # first argument is identifier of the user, second argument is optional for elmo
     if len(args) > 1:
-        if args[1] == "elmo":
-             filename = "gaze_data_elmo_"
-    else:
-        filename = "gaze_data_"
-
+        filename = "gaze_data_" + args[1] 
+        if args[2] == "elmo": 
+             filename = filename + "_" + args[2]      
+        
     print("Subscribing to data for eye tracker with serial number {0}.".format(my_eyetracker.serial_number))
     time.sleep(3)
     # my_eyetracker.subscribe_to(tr.EYETRACKER_USER_POSITION_GUIDE, user_position_guide_callback, as_dictionary=True)
