@@ -87,22 +87,20 @@ class FixationFilter():
         # self.right_pixels_y_elmo = self.window_size[1] - self.right_pixels_x_elmo // 2
 
 
+        # self.time_stamp_elmo = data2['SystemTimestamp']
 
-        self.time_stamp_elmo = data2['SystemTimestamp']
-        
-        self.time = (self.time_stamp - self.time_stamp[0])/1e6
-        self.time_elmo = (self.time_stamp_elmo - self.time_stamp_elmo[0])/1e6
-        # get last time
-        max_time = max(self.time)
-        max_time_elmo = max(self.time_elmo)
-        difference = abs(max_time - max_time_elmo)
+        # use computer timestamp
 
-        if max_time_elmo > max_time:
-            self.time = self.time + difference
+        self.time_stamp_elmo = data2['ComputerTimestamp']
+        self.time_stamp = data['ComputerTimestamp']
+
+        if self.time_stamp_elmo[0] > self.time_stamp[0]: # if elmo recording starts later than computer recording
+            self.time = (self.time_stamp - self.time_stamp[0])
+            self.time_elmo = (self.time_stamp_elmo - self.time_stamp[0])
         else:
-            self.time_elmo = self.time_elmo + difference
-            
-        print('Max time:', max_time, 'Max time elmo:', max_time_elmo)
+            self.time = (self.time_stamp - self.time_stamp_elmo[0])
+            self.time_elmo = (self.time_stamp_elmo - self.time_stamp_elmo[0])
+        
         
         self.left_validity_elmo = data2['LeftValidity']
         self.right_validity_elmo = data2['RightValidity']
@@ -122,19 +120,25 @@ class FixationFilter():
         self.classifications_elmo, self.fixations_elmo, self.saccades_elmo, self.gaps_elmo, self.fixation_count_elmo, self.saccades_count_elmo, self.gaps_count_elmo = self.velocity_classifier(self.velocity_elmo, self.time_elmo)
         self.process_fixations()  
 
+    def safe_nanmean(self, arrays, axis=0):
+        combined = np.array(arrays)
+        if np.all(np.isnan(combined)):
+            return np.nan
+        return np.nanmean(combined, axis=axis)
+    
     def selection_elmo(self, method = 'average'):
         if method == 'average' or method == 'strict_average':
             # calculate the mean while ignoring NaN values
-            self.gaze_point_x_elmo = np.nanmean(np.array([self.left_gaze_point_3dx_elmo, self.right_gaze_point_3dx_elmo]), axis=0)
-            self.gaze_point_y_elmo = np.nanmean(np.array([self.left_gaze_point_3dy_elmo, self.right_gaze_point_3dy_elmo]), axis=0)
-            self.gaze_point_z_elmo = np.nanmean(np.array([self.left_gaze_point_3dz_elmo, self.right_gaze_point_3dz_elmo]), axis=0)
-            self.eye_position_x_elmo = np.nanmean(np.array([self.left_eye_position_3dx_elmo, self.right_eye_position_3dx_elmo]), axis=0)
-            self.eye_position_y_elmo = np.nanmean(np.array([self.left_eye_position_3dy_elmo, self.right_eye_position_3dy_elmo]), axis=0)
-            self.eye_position_z_elmo = np.nanmean(np.array([self.left_eye_position_3dz_elmo, self.right_eye_position_3dz_elmo]), axis=0)
-            self.normalized_x_elmo = np.nanmean(np.array([self.left_normalized_x_elmo, self.right_normalized_x_elmo]), axis=0)
-            self.normalized_y_elmo = np.nanmean(np.array([self.left_normalized_y_elmo, self.right_normalized_y_elmo]), axis=0)
-            self.pixels_x_elmo = np.nanmean(np.array([self.left_pixels_x_elmo, self.right_pixels_x_elmo]), axis=0)
-            self.pixels_y_elmo = np.nanmean(np.array([self.left_pixels_y_elmo, self.right_pixels_y_elmo]), axis=0)
+            self.gaze_point_x_elmo = self.safe_nanmean([self.left_gaze_point_3dx_elmo, self.right_gaze_point_3dx_elmo])
+            self.gaze_point_y_elmo = self.safe_nanmean([self.left_gaze_point_3dy_elmo, self.right_gaze_point_3dy_elmo])
+            self.gaze_point_z_elmo = self.safe_nanmean([self.left_gaze_point_3dz_elmo, self.right_gaze_point_3dz_elmo])
+            self.eye_position_x_elmo = self.safe_nanmean([self.left_eye_position_3dx_elmo, self.right_eye_position_3dx_elmo])
+            self.eye_position_y_elmo = self.safe_nanmean([self.left_eye_position_3dy_elmo, self.right_eye_position_3dy_elmo])
+            self.eye_position_z_elmo = self.safe_nanmean([self.left_eye_position_3dz_elmo, self.right_eye_position_3dz_elmo])
+            self.normalized_x_elmo = self.safe_nanmean([self.left_normalized_x_elmo, self.right_normalized_x_elmo])
+            self.normalized_y_elmo = self.safe_nanmean([self.left_normalized_y_elmo, self.right_normalized_y_elmo])
+            self.pixels_x_elmo = self.safe_nanmean([self.left_pixels_x_elmo, self.right_pixels_x_elmo])
+            self.pixels_y_elmo = self.safe_nanmean([self.left_pixels_y_elmo, self.right_pixels_y_elmo])
 
             if method =='strict_average':
                 # check validity of both eyes
@@ -178,16 +182,16 @@ class FixationFilter():
     def selection(self, method = 'average'):
         if method == 'average' or method == 'strict_average':
             # calculate the mean while ignoring NaN values
-            self.gaze_point_x = np.nanmean(np.array([self.left_gaze_point_3dx, self.right_gaze_point_3dx]), axis=0)
-            self.gaze_point_y = np.nanmean(np.array([self.left_gaze_point_3dy, self.right_gaze_point_3dy]), axis=0)
-            self.gaze_point_z = np.nanmean(np.array([self.left_gaze_point_3dz, self.right_gaze_point_3dz]), axis=0)
-            self.eye_position_x = np.nanmean(np.array([self.left_eye_position_3dx, self.right_eye_position_3dx]), axis=0)
-            self.eye_position_y = np.nanmean(np.array([self.left_eye_position_3dy, self.right_eye_position_3dy]), axis=0)
-            self.eye_position_z = np.nanmean(np.array([self.left_eye_position_3dz, self.right_eye_position_3dz]), axis=0)
-            self.normalized_x = np.nanmean(np.array([self.left_normalized_x, self.right_normalized_x]), axis=0)
-            self.normalized_y = np.nanmean(np.array([self.left_normalized_y, self.right_normalized_y]), axis=0)
-            self.pixels_x = np.nanmean(np.array([self.left_pixels_x, self.right_pixels_x]), axis=0)
-            self.pixels_y = np.nanmean(np.array([self.left_pixels_y, self.right_pixels_y]), axis=0)
+            self.gaze_point_x = self.safe_nanmean(np.array([self.left_gaze_point_3dx, self.right_gaze_point_3dx]), axis=0)
+            self.gaze_point_y = self.safe_nanmean(np.array([self.left_gaze_point_3dy, self.right_gaze_point_3dy]), axis=0)
+            self.gaze_point_z = self.safe_nanmean(np.array([self.left_gaze_point_3dz, self.right_gaze_point_3dz]), axis=0)
+            self.eye_position_x = self.safe_nanmean(np.array([self.left_eye_position_3dx, self.right_eye_position_3dx]), axis=0)
+            self.eye_position_y = self.safe_nanmean(np.array([self.left_eye_position_3dy, self.right_eye_position_3dy]), axis=0)
+            self.eye_position_z = self.safe_nanmean(np.array([self.left_eye_position_3dz, self.right_eye_position_3dz]), axis=0)
+            self.normalized_x = self.safe_nanmean(np.array([self.left_normalized_x, self.right_normalized_x]), axis=0)
+            self.normalized_y = self.safe_nanmean(np.array([self.left_normalized_y, self.right_normalized_y]), axis=0)
+            self.pixels_x = self.safe_nanmean(np.array([self.left_pixels_x, self.right_pixels_x]), axis=0)
+            self.pixels_y = self.safe_nanmean(np.array([self.left_pixels_y, self.right_pixels_y]), axis=0)
 
             if method =='strict_average':
                 # check validity of both eyes
@@ -604,8 +608,20 @@ class FixationFilter():
 
         self.merged_fixations = self.merge_fixations(self.fixations, self.time, self.theta)
         self.merged_fixations_elmo = self.merge_fixations(self.fixations_elmo, self.time_elmo, self.theta_elmo)
+
         self.final_fixations, self.final_fixation_count = self.discard_fixations(self.merged_fixations, self.classifications, self.pixels_x, self.pixels_y, self.time)
+        # calculate total fixation duration and average fixation duration
+        self.total_fixation_duration = np.sum([fixation['duration'] for fixation in self.final_fixations])
+        self.average_fixation_duration = self.total_fixation_duration / self.final_fixation_count
+
         self.final_fixations_elmo, self.final_fixation_count_elmo = self.discard_fixations(self.merged_fixations_elmo, self.classifications_elmo, self.pixels_x_elmo, self.pixels_y_elmo, self.time_elmo)
+        self.total_fixation_duration_elmo = np.sum([fixation['duration'] for fixation in self.final_fixations_elmo])
+        self.average_fixation_duration_elmo = self.total_fixation_duration_elmo / self.final_fixation_count_elmo
+
+        print('TOTAL FIXATION DURATION:', self.total_fixation_duration)
+        print('AVERAGE FIXATION DURATION:', self.average_fixation_duration)
+        print('TOTAL FIXATION DURATION ELMO:', self.total_fixation_duration_elmo)
+        print('AVERAGE FIXATION DURATION ELMO:', self.average_fixation_duration_elmo)
 
     def merge_fixations(self, fixations, time, theta):
         '''Merge fixations that are close to each other, minimum time and angle between fixations'''
@@ -674,33 +690,68 @@ class FixationFilter():
 
     def plot_normalized_elmo(self):
         fig, ax = plt.subplots()
-        plt.scatter(self.left_normalized_x_elmo, self.left_normalized_y_elmo, marker = 'x', color = 'b')
-        # plot the rectangle
-        rectangle = patches.Rectangle((self.normalized_elmo_agent_position[0], self.normalized_elmo_agent_position[1]), self.normalized_elmo_agent_size[0], self.normalized_elmo_agent_size[1], linewidth=1, edgecolor='black', facecolor='none')
+        # Scatter plot for gaze points
+        plt.scatter(self.left_normalized_x_elmo, self.left_normalized_y_elmo, marker='x', color='b', label='Gaze Points')
+        # Plot the rectangle
+        rectangle = patches.Rectangle(
+            (self.normalized_elmo_agent_position[0], self.normalized_elmo_agent_position[1]),
+            self.normalized_elmo_agent_size[0],
+            self.normalized_elmo_agent_size[1],
+            linewidth=1, edgecolor='black', facecolor='none', label='Agent Position'
+        )
         ax.add_patch(rectangle)
-        # plot the ellipsoid
-        ellipsoid = patches.Ellipse((0.5, 0.5), self.normalized_elmo_agent_size[0], self.normalized_elmo_agent_size[1], linewidth=1, edgecolor='black', facecolor='none', label='Area of Interest')
+        # Plot the ellipsoid
+        ellipsoid = patches.Ellipse(
+            (0.5, 0.5),  # Center of the ellipsoid
+            self.normalized_elmo_agent_size[0],  # Width of the ellipsoid
+            self.normalized_elmo_agent_size[1],  # Height of the ellipsoid
+            linewidth=1, edgecolor='black', facecolor='none', label='Area of Interest'
+        )
         ax.add_patch(ellipsoid)
+        # Set labels and title
         plt.xlabel('Normalized gaze position along the x-axis')
         plt.ylabel('Normalized gaze position along the y-axis')
-        plt.title('Normalized gaze position (x, y)')
+        plt.title('Normalized gaze position (x, y) for Elmo tracker')
+        # Invert y-axis to match the coordinate system description
         plt.gca().invert_yaxis()
+        # Set equal aspect ratio
+        ax.set_aspect('equal', adjustable='box')
+        # Enable grid
         plt.grid()
+        # Add legend
+        plt.legend()
 
     def plot_pixel_elmo(self):
         fig, ax = plt.subplots()
-        plt.scatter(self.pixels_x_elmo, self.pixels_y_elmo, marker = 'x', color = 'b')
-        # plot the rectangle
-        rectangle = patches.Rectangle((self.elmo_agent_position[0], self.elmo_agent_position[1]), self.elmo_agent_size[0], self.elmo_agent_size[1], linewidth=1, edgecolor='black', facecolor='none')
+        
+        # Scatter plot for gaze points
+        plt.scatter(self.pixels_x_elmo, self.pixels_y_elmo, marker='x', color='b', label='Gaze Points')
+        
+        # Plot the rectangle based on the agent's pixel position and size
+        rectangle = patches.Rectangle(
+            (self.elmo_agent_position[0], self.elmo_agent_position[1]),  # Bottom-left corner
+            self.elmo_agent_size[0],  # Width
+            self.elmo_agent_size[1],  # Height
+            linewidth=1, edgecolor='black', facecolor='none', label='Agent Position (Elmo Face)'
+        )
         ax.add_patch(rectangle)
-        # plot the ellipsoid
-        ellipsoid = patches.Ellipse((self.window_size[0]*0.5, self.window_size[1]*0.5), self.elmo_agent_size[0], self.elmo_agent_size[1], linewidth=1, edgecolor='black', facecolor='none', label='Area of Interest')
+        # Plot the ellipsoid based on the window size
+        ellipsoid = patches.Ellipse(
+            (self.window_size[0] * 0.5, self.window_size[1] * 0.5),  # Center of the ellipsoid
+            self.elmo_agent_size[0],  # Width of the ellipsoid
+            self.elmo_agent_size[1],  # Height of the ellipsoid
+            linewidth=1, edgecolor='black', facecolor='none', label='Area of Interest'
+        )
         ax.add_patch(ellipsoid)
-        plt.legend(fontsize = 6)
+        # Add legend
+        plt.legend(fontsize=6)
+        # Set labels and title
         plt.xlabel('X-axis Pixels')
         plt.ylabel('Y-axis Pixels')
         plt.title('Gaze position in pixels for Elmo Tracker')
+        # Invert y-axis to match the coordinate system where (0,0) is the top-left corner
         plt.gca().invert_yaxis()
+        # Enable grid
         plt.grid()
 
     def plot_normalized_x_y_gaze_point(self):
@@ -758,7 +809,7 @@ class FixationFilter():
         plt.ylabel('Gaze position')
         plt.grid()
 
-    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 200, gaussiansd = 33):
+    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 100, gaussiansd = 33):
 
         '''Plot a heatmap of the fixations, taken from https://github.com/TobiasRoeddiger/GazePointHeatMap/blob/master/gazeheatplot.py'''
         # gaussian kernel parameters
@@ -806,7 +857,6 @@ class FixationFilter():
         heatmap[heatmap < lowbound] = 0
 
         # plot heatmap
-
         plt.figure()
         plt.imshow(heatmap, cmap = 'viridis', alpha = alpha) 
         # title 
@@ -893,7 +943,6 @@ class FixationFilter():
         # save high quality
         plt.savefig('images/gaze_and_velocity_plot_'+ self.file + '.png', dpi = 300)
         self.plot_heatmap_fixations(self.final_fixations, self.file)
-        # self.call_heatmap(self.final_fixations, self.file)
         self.plot_scanpath_fixations(self.final_fixations, self.file)
         self.plot_fixation_map(self.final_fixations, self.file)
     
@@ -928,14 +977,13 @@ class FixationFilter():
         # save high quality
         plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
         self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
-        # self.call_heatmap(self.final_fixations_elmo, self.file2)
         self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
         self.plot_fixation_map(self.final_fixations_elmo, self.file2)
 
 
 if __name__ == '__main__':
-    filename_elmo = 'gaze_data_elmo_11-04-15-03'
-    filename_screen = 'gaze_data_11-04-15-03'
+    filename_elmo = 'gaze_data_OX22elmo10-05-12-14'
+    filename_screen = 'gaze_data_OX2210-05-12-14'
     file_elmo = 'gaze_data/' + filename_elmo + '.csv'
     file_screen = 'gaze_data/' + filename_screen + '.csv'
     data_elmo = pd.read_csv(file_elmo)
