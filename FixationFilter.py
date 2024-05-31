@@ -809,7 +809,7 @@ class FixationFilter():
         plt.ylabel('Gaze position')
         plt.grid()
 
-    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 100, gaussiansd = 33):
+    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 200, gaussiansd = 33):
 
         '''Plot a heatmap of the fixations, taken from https://github.com/TobiasRoeddiger/GazePointHeatMap/blob/master/gazeheatplot.py'''
         # gaussian kernel parameters

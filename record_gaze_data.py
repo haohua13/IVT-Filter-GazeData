@@ -174,13 +174,12 @@ if __name__ == "__main__":
         filename = "gaze_data_" + args[1]
         if len(args)> 2:
             if args[2] == "elmo": 
-                filename = filename + args[2]      
+                filename = filename + args[2]       
            
     print("Subscribing to data for eye tracker with serial number {0}.".format(my_eyetracker.serial_number))
-    time.sleep(3)
+    time.sleep(2)
     # my_eyetracker.subscribe_to(tr.EYETRACKER_USER_POSITION_GUIDE, user_position_guide_callback, as_dictionary=True)
     my_eyetracker.subscribe_to(tr.EYETRACKER_GAZE_DATA, gaze_data_callback, as_dictionary=True)
-
     while True:
         if keyboard.is_pressed('w'): # press w keyboard to stop the recording
             write_all_data_to_file(filename)
