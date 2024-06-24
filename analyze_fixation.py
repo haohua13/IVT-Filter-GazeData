@@ -428,6 +428,14 @@ def plot_duration_over_time(data):
     plt.tight_layout()
     plt.savefig('results/example_fixation_duration_over_time.png', dpi = 1200, bbox_inches = 'tight')
 
+def plot_fixation_duration_over_task(data):
+    # absolute values, same as plot_duration_over_time
+    pass
+
+def plot_fixation_count_over_task(data):
+    # absolute values, same as plot_count_over_time
+    pass
+
 if __name__ == '__main__':
     file = 'tracker_results_final.csv'
     df = pd.read_csv(file)
@@ -436,11 +444,11 @@ if __name__ == '__main__':
     ox_data = df[df['ID'].str.startswith('OX')]
     plt.rcParams['font.family'] = 'sans-serif'  # Set global font to sans-serif
     plt.rcParams['font.sans-serif'] = 'Arial'  # Specify the font name explicitly
-    box_plot_mean_fixation(o_data, ox_data)
-    box_plot_total_fixation(o_data, ox_data)
-    box_plot_fixation_count(o_data, ox_data)
-    box_plot_count_tension(o_data, ox_data)
-    box_plot_time_tension(o_data, ox_data)
+    # box_plot_mean_fixation(o_data, ox_data)
+    # box_plot_total_fixation(o_data, ox_data)
+    # box_plot_fixation_count(o_data, ox_data)
+    # box_plot_count_tension(o_data, ox_data)
+    # box_plot_time_tension(o_data, ox_data)
 
     file2 = 'interval_data.csv'
     df = pd.read_csv(file2)
@@ -452,8 +460,9 @@ if __name__ == '__main__':
     # get all ox condition data
     ox_data = df[df['id'].isin(condition_ox)]
 
-    plot_average_counts_over_time(o_data, ox_data)
-    plot_average_durations_over_time(o_data, ox_data)
+    # plot_average_counts_over_time(o_data, ox_data)
+    # plot_average_durations_over_time(o_data, ox_data)
 
     # plt.show()
+
 
