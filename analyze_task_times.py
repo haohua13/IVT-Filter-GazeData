@@ -36,7 +36,6 @@ with open('task_click_times.csv', 'w', newline='') as file:
     writer.writerows(processed_data)
 
 
-
 # We can divide the task in
 # 1. click_start/start_time to click_to_tutorial (before tutorial)
 # 2. click_to_tutorial to click_to_task (tutorial)

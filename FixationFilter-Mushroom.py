@@ -155,6 +155,8 @@ class FixationFilter():
         print('Initial Time: ', filtered_data['ComputerTimestamp'][0])
         print('Initial Time Elmo: ',filtered_data2['ComputerTimestamp'][0])
 
+        
+
         return filtered_data, filtered_data2
     
              

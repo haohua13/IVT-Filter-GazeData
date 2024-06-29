@@ -117,6 +117,8 @@ class FixationFilter():
         self.time = self.time_stamp - self.time_stamp[0]
         self.time_elmo = self.time_stamp_elmo - self.time_stamp[0]
 
+        self.task_data['timestamp'] = self.task_data['timestamp'] - self.task_data['timestamp'][0]
+
         # Data to save
         self.fixation_count = 0
         self.fixation_count_elmo = 0
@@ -670,7 +672,7 @@ class FixationFilter():
         self.average_fixation_duration_elmo = self.total_fixation_duration_elmo / self.final_fixation_count_elmo
         
         self.fixations_over_task()
-        self.fixations_over_time()
+        # self.fixations_over_time()
 
         print('TOTAL FIXATION DURATION:', self.total_fixation_duration)
         print('AVERAGE FIXATION DURATION:', self.average_fixation_duration)
@@ -680,29 +682,43 @@ class FixationFilter():
     def calculate_task_intervals(self):
         '''Calculate the start and end of each task interval'''
         intervals = []
-        previous_start = 0
+        previous_start = None
         print(len(self.task_data))
+        task = 1
+        # remove indexing of the task_data
         for i in range(len(self.task_data)):
+            print('Task:', i)
             if self.task_data['event'][i] == 'click_to_tutorial': # first task
-                closest_index = min(range(len(self.time)), key=lambda i: abs(self.time[i] - self.task_data['timestamp'][i]))
-                intervals.append((0, closest_index))
+                print('Click to Tutorial:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((0, closest_index, -1))
+                print(self.time[closest_index])
+            
                 previous_start = closest_index
             elif self.task_data['event'][i] == 'tutorial_task':
-                closest_index = min(range(len(self.time)), key=lambda i: abs(self.time[i] - self.task_data['timestamp'][i]))
-                intervals.append((previous_start, closest_index))
+                print('Tutorial Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((previous_start, closest_index, 0))
                 previous_start = closest_index
-            elif self.task_data['event'][i] == 'final_mushroom_task':
-                closest_index = min(range(len(self.time)), key=lambda i: abs(self.time[i] - self.task_data['timestamp'][i]))
-                intervals.append((previous_start, closest_index))
+            elif self.task_data['event'][i] == 'final_mushroom_task' and i>6 and i<len(self.task_data)-1:
+                print('Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((previous_start, closest_index, task))
                 previous_start = closest_index
+                task = task + 1
+
+            elif i == len(self.task_data)-1:
+                task = 15
+                print('Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                intervals.append((previous_start, len(self.time)-1, task))
+                print(len(self.time)-1)
             print('Intervals:', intervals)
-            print(self.task_data[i])
         return intervals
 
     def fixations_over_task(self):
         
         interval_data = {'id': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixations_counts_elmo': [], 
-                         'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixations_counts_elmo': [], 'game_state': []}
+                         'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixations_counts_elmo': [], 'game_percentage': [], 'task': []}
 
         acc_interval_fixation_duration = 0
         acc_interval_fixation_count = 0
@@ -711,6 +727,44 @@ class FixationFilter():
         total_time = int(len(self.time))
 
         intervals = self.calculate_task_intervals()
+
+        for start, end, task in intervals:
+            interval_fixation_duration = 0
+            interval_fixation_count = 0
+            interval_fixation_duration_elmo = 0
+            interval_fixation_count_elmo = 0
+
+            print('Start:', start, 'End:', end, 'Task:', task)
+            for fixation in self.final_fixations:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    interval_fixation_duration += fixation['duration']
+                    interval_fixation_count += 1
+            acc_interval_fixation_duration += interval_fixation_duration
+            acc_interval_fixation_count += interval_fixation_count
+
+            interval_data['fixation_durations'].append(interval_fixation_duration)
+            interval_data['fixation_counts'].append(interval_fixation_count)
+            interval_data['accumulate_fixation_durations'].append(acc_interval_fixation_duration)
+            interval_data['accumulate_fixation_counts'].append(acc_interval_fixation_count)
+
+            for fixation in self.final_fixations_elmo:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    interval_fixation_duration_elmo += fixation['duration']
+                    interval_fixation_count_elmo += 1
+            acc_interval_fixation_duration_elmo += interval_fixation_duration_elmo
+            acc_interval_fixation_count_elmo += interval_fixation_count_elmo
+
+            interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo)
+            interval_data['fixations_counts_elmo'].append(interval_fixation_count_elmo)
+            interval_data['accumulate_fixation_durations_elmo'].append(acc_interval_fixation_duration_elmo)
+            interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)
+            interval_data['game_percentage'].append(end/total_time*100)
+            interval_data['task'].append(task)
+            
+
+        self.interval_data = interval_data
+        print('INTERVAL DATA:', self.interval_data)
+        self.write_to_file()
 
 
 
@@ -722,7 +776,6 @@ class FixationFilter():
         intervals = [(i * interval_size, (i + 1) * interval_size) for i in range(20)]
         interval_data = {'id': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixations_counts_elmo': [], 
                          'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixations_counts_elmo': [], 'game_percentage': []}
-
         acc_interval_fixation_duration = 0
         acc_interval_fixation_count = 0
         acc_interval_fixation_duration_elmo = 0
@@ -1201,7 +1254,7 @@ if __name__ == '__main__':
         # obtain all timestamps and events from user in task_times.csv
         current_task_data = task_data[task_data['ID'] == user]
         print(current_task_data)
-
+        current_task_data = current_task_data.reset_index(drop=True)
 
         fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user, current_task_data)
         fixation_filter.process_data()

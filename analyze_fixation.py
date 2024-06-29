@@ -406,6 +406,132 @@ def plot_average_durations_over_time(o_data, ox_data):
     plt.tight_layout()
     plt.savefig('results/average_fixation_durations_over_time.png', dpi=1200, bbox_inches='tight')
 
+def plot_average_duration_over_task(o_data, ox_data):
+    # task is values from -1 to 15
+    N = 14
+    task = o_data['task']
+    o_array_fixation_durations = []
+    o_array_fixation_durations_elmo = []
+    ox_array_fixation_durations = []
+    ox_array_fixation_durations_elmo = []
+    
+    for j in range(0, 17):
+        o_fixation_duration = 0
+        o_fixation_duration_elmo = 0
+        ox_fixation_duration = 0
+        ox_fixation_duration_elmo = 0
+        for i in range(0, len(task), 17):
+            o_fixation_duration += o_data['fixation_durations'][i+j]
+            o_fixation_duration_elmo += o_data['fixation_durations_elmo'][i+j]
+            ox_fixation_duration += ox_data['fixation_durations'][i+j+len(task)]
+            ox_fixation_duration_elmo += ox_data['fixation_durations_elmo'][i+j+len(task)]
+        average_o_fixation_duration = o_fixation_duration / N
+        average_o_fixation_duration_elmo = o_fixation_duration_elmo / N
+        average_ox_fixation_duration = ox_fixation_duration / N
+        average_ox_fixation_duration_elmo = ox_fixation_duration_elmo / N
+        o_array_fixation_durations.append(average_o_fixation_duration)
+        o_array_fixation_durations_elmo.append(average_o_fixation_duration_elmo)
+        ox_array_fixation_durations.append(average_ox_fixation_duration)
+        ox_array_fixation_durations_elmo.append(average_ox_fixation_duration_elmo)
+    # Create the plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(task[0:17], o_array_fixation_durations[0:17], marker = 'o', linestyle = '--', color='b', label='O')
+    plt.plot(task[0:17], ox_array_fixation_durations[0:17], marker = 'o', linestyle = '--', color='k', label='OX')
+    plt.xlim(-1, 15)
+    plt.xticks(np.arange(-1, 15, 1))
+    # Add labels and title
+    plt.xlabel('Task')
+    plt.ylabel('Computer Fixation Duration [s]')
+    # plt.title('Fixation Durations Over Task')
+    plt.grid(True)
+    plt.legend()
+    # Show the plot
+    plt.tight_layout()
+    plt.savefig('results/computer_average_fixation_durations_over_task.png', dpi=1200, bbox_inches='tight')
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(task[0:17], o_array_fixation_durations_elmo[0:17], marker = 'o', linestyle = '--', color='b', label='O')
+    plt.plot(task[0:17], ox_array_fixation_durations_elmo[0:17], marker = 'o', linestyle = '--', color='k', label='OX')
+    # plot in axis x = task -1 is introduction 
+    # plot in axis x = task 0 is tutorial task
+    plt.xlim(-1, 15)
+    plt.xticks(np.arange(-1, 15, 1))
+    # Add labels and title
+    plt.xlabel('Task')
+    plt.ylabel('Elmo Fixation Duration [s]')
+    # plt.title('Fixation Durations Over Task')
+    plt.grid(True)
+
+    plt.legend()
+
+    # Show the plot
+    plt.tight_layout()
+    plt.savefig('results/elmo_average_fixation_durations_over_task.png', dpi=1200, bbox_inches='tight')
+
+
+def plot_average_count_over_task(o_data, ox_data):
+    N = 14
+    task = o_data['task']
+    o_array_fixation_counts = []
+    o_array_fixation_counts_elmo = []
+    ox_array_fixation_counts = []
+    ox_array_fixation_counts_elmo = []
+    for j in range(0, 17):
+        o_fixation_count = 0
+        o_fixation_count_elmo = 0
+        ox_fixation_count = 0
+        ox_fixation_count_elmo = 0
+        for i in range(0, len(task), 17):
+            o_fixation_count += o_data['fixation_counts'][i+j]
+            o_fixation_count_elmo += o_data['fixations_counts_elmo'][i+j]
+            ox_fixation_count += ox_data['fixation_counts'][i+j+len(task)]
+            ox_fixation_count_elmo += ox_data['fixations_counts_elmo'][i+j+len(task)]
+        average_o_fixation_count = o_fixation_count / N
+        average_o_fixation_count_elmo = o_fixation_count_elmo / N
+        average_ox_fixation_count = ox_fixation_count / N
+        average_ox_fixation_count_elmo = ox_fixation_count_elmo / N
+        o_array_fixation_counts.append(average_o_fixation_count)
+        o_array_fixation_counts_elmo.append(average_o_fixation_count_elmo)
+        ox_array_fixation_counts.append(average_ox_fixation_count)
+        ox_array_fixation_counts_elmo.append(average_ox_fixation_count_elmo)
+    # Create the plot
+    plt.figure(figsize=(10, 6))
+    plt.plot(task[0:17], o_array_fixation_counts[0:17], marker = 'o', linestyle = '--', color='b', label='O')
+    plt.plot(task[0:17], ox_array_fixation_counts[0:17], marker = 'o', linestyle = '--', color='k', label='OX')
+    plt.xlim(-1, 15)
+    plt.xticks(np.arange(-1, 15, 1))
+    # Add labels and title
+    plt.xlabel('Task')
+    plt.ylabel('Computer Fixation Count')
+    # plt.title('Fixation Counts Over Task')
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig('results/computer_average_fixation_counts_over_task.png', dpi=1200, bbox_inches='tight')
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(task[0:17], o_array_fixation_counts_elmo[0:17], marker = 'o', linestyle = '--', color='b', label='O')
+    plt.plot(task[0:17], ox_array_fixation_counts_elmo[0:17], marker = 'o', linestyle = '--', color='k', label='OX')
+    plt.xlim(-1, 15)
+    plt.xticks(np.arange(-1, 15, 1))
+    # Add labels and title
+    plt.xlabel('Task')
+    plt.ylabel('Elmo Fixation Count')
+    # plt.title('Fixation Counts Over Task')
+    plt.grid(True)
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.savefig('results/elmo_average_fixation_counts_over_task.png', dpi=1200, bbox_inches='tight')
+
+
+
+    
+
+
+
+
+
 
 def plot_duration_over_time(data):
     value = data[data['id'] == 'O20']
@@ -428,13 +554,9 @@ def plot_duration_over_time(data):
     plt.tight_layout()
     plt.savefig('results/example_fixation_duration_over_time.png', dpi = 1200, bbox_inches = 'tight')
 
-def plot_fixation_duration_over_task(data):
-    # absolute values, same as plot_duration_over_time
-    pass
 
-def plot_fixation_count_over_task(data):
-    # absolute values, same as plot_count_over_time
-    pass
+
+
 
 if __name__ == '__main__':
     file = 'tracker_results_final.csv'
@@ -450,7 +572,7 @@ if __name__ == '__main__':
     # box_plot_count_tension(o_data, ox_data)
     # box_plot_time_tension(o_data, ox_data)
 
-    file2 = 'interval_data.csv'
+    file2 = 'fixation_data_by_time_percentage.csv'
     df = pd.read_csv(file2)
     # plot_count_over_time(df)
     # plot_duration_over_time(df)
@@ -462,6 +584,15 @@ if __name__ == '__main__':
 
     # plot_average_counts_over_time(o_data, ox_data)
     # plot_average_durations_over_time(o_data, ox_data)
+
+    file3 = 'fixation_data_by_tasks.csv'
+
+    df = pd.read_csv(file3)
+    o_data = df[df['id'].isin(condition_o)]
+    ox_data = df[df['id'].isin(condition_ox)]
+    plot_average_duration_over_task(o_data, ox_data)
+    plot_average_count_over_task(o_data, ox_data)
+
 
     # plt.show()
 
