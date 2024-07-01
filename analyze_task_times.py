@@ -9,6 +9,7 @@ date_format = "%m/%d/%Y %I:%M:%S %p"
 time_object = datetime.strptime(date_time, date_format)
 timestamps = time_object.timestamp()
 processed_data = []
+
 # Iterate over each row in the DataFrame
 for index, row in df.iterrows():
     event_name = row['Name'].strip()  # Extract the event name
@@ -24,13 +25,15 @@ for index, row in df.iterrows():
         processed_data.append([row['ID'], timestamp_str, 'click_to_tutorial'])
     elif event_name == 'click_to_task':
         processed_data.append([row['ID'], timestamp_str, 'tutorial_task'])
-    elif 'human decision in mushroom' in obs_text:
-        processed_data.append([row['ID'], timestamp_str, 'human_mushroom_task'])
+    elif 'confindence' in obs_text:
+        processed_data.append([row['ID'], timestamp_str, 'end_human_decision'])
     elif 'final decision in mushroom' in obs_text:
-        processed_data.append([row['ID'], timestamp_str, 'final_mushroom_task'])
+        processed_data.append([row['ID'], timestamp_str, 'end_human_ai_decision'])
+        timestamp = timestamp_str + 2  # add 2 seconds to the timestamp
+        processed_data.append([row['ID'], timestamp, 'feedback'])
 
 # Save the processed data to a CSV file
-with open('task_click_times.csv', 'w', newline='') as file:
+with open('task-times-by-decision.csv', 'w', newline='') as file:
     writer = csv.writer(file)
     writer.writerow(['ID', 'timestamp', 'event'])
     writer.writerows(processed_data)
@@ -44,6 +47,9 @@ with open('task_click_times.csv', 'w', newline='') as file:
 
 # can be interesting to see the time spent on each task
 # can be interesting to see the fixation between human_decision and final_decision_in_mushroom (thinking time)
+
+
+
 
 
 

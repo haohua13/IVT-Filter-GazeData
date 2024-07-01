@@ -106,8 +106,16 @@ class FixationFilter():
         self.time_stamp_elmo = filtered_data2['ComputerTimestamp']
         self.time_stamp = filtered_data['ComputerTimestamp']
 
-        self.time = self.time_stamp - self.time_stamp[0]
-        self.time_elmo = self.time_stamp_elmo - self.time_stamp[0]
+        # This is not necessary after game time
+        # if self.time_stamp_elmo[0] > self.time_stamp[0]: # if elmo recording starts later than computer recording
+        #     self.time = (self.time_stamp - self.time_stamp[0])
+        #     self.time_elmo = (self.time_stamp_elmo - self.time_stamp[0])
+        # else:
+        #     self.time = (self.time_stamp - self.time_stamp_elmo[0])
+        #     self.time_elmo = (self.time_stamp_elmo - self.time_stamp_elmo[0])
+
+        self.time = self.time_stamp + 2 - self.time_stamp[0] # feedback delay
+        self.time_elmo = self.time_stamp_elmo + 2 - self.time_stamp[0] # feedback delay
 
         self.task_data['timestamp'] = self.task_data['timestamp'] - self.task_data['timestamp'][0]
 
@@ -494,7 +502,7 @@ class FixationFilter():
         window_size = int(window_length / np.mean(np.diff(self.time_elmo)))
         # calculate the average velocity
         for i in range(len(self.gaze_point_x_elmo)):
-            # Determine start and end indices of the window
+            # determine start and end indices of the window
             start_index = max(0, i - window_size // 2)
             end_index = min(len(self.gaze_point_x_elmo) - 1, i + window_size // 2)
             if end_index - start_index + 1 >= 2:
@@ -681,29 +689,34 @@ class FixationFilter():
         for i in range(len(self.task_data)):
             print('Task:', i)
             if self.task_data['event'][i] == 'click_to_tutorial': # first task
-                print('Click to Tutorial:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                print('User clicked to Tutorial:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
                 intervals.append((0, closest_index, -1))
                 print(self.time[closest_index])
-            
                 previous_start = closest_index
             elif self.task_data['event'][i] == 'tutorial_task':
-                print('Tutorial Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                print('User finished Tutorial Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
                 intervals.append((previous_start, closest_index, 0))
                 previous_start = closest_index
-            elif self.task_data['event'][i] == 'final_mushroom_task' and i>6 and i<len(self.task_data)-1:
-                print('Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+
+            elif self.task_data['event'][i] == 'end_human_decision' and i>8:
+                print('End Human Task/Start AI-Human Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((previous_start, closest_index, task))
+                previous_start = closest_index
+            # elif self.task_data['event'][i] == 'end_human_ai_decision' and i>8:
+            #     print('End Human-AI Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+            #     closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+            #     intervals.append((previous_start, closest_index, task))
+            #     previous_start = closest_index   
+            
+            elif self.task_data['event'][i] == 'feedback' and i>8:
+                print('Feedback/End Of Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
                 intervals.append((previous_start, closest_index, task))
                 previous_start = closest_index
                 task = task + 1
-
-            elif i == len(self.task_data)-1:
-                task = 15
-                print('Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
-                intervals.append((previous_start, len(self.time)-1, task))
-                print(len(self.time)-1)
             print('Intervals:', intervals)
         return intervals
 
@@ -734,7 +747,7 @@ class FixationFilter():
             acc_interval_fixation_duration += interval_fixation_duration
             acc_interval_fixation_count += interval_fixation_count
 
-            interval_data['fixation_durations'].append(interval_fixation_duration)
+            interval_data['fixation_durations'].append(interval_fixation_duration/interval_fixation_count if interval_fixation_count != 0 else 0)
             interval_data['fixation_counts'].append(interval_fixation_count)
             interval_data['accumulate_fixation_durations'].append(acc_interval_fixation_duration)
             interval_data['accumulate_fixation_counts'].append(acc_interval_fixation_count)
@@ -746,7 +759,7 @@ class FixationFilter():
             acc_interval_fixation_duration_elmo += interval_fixation_duration_elmo
             acc_interval_fixation_count_elmo += interval_fixation_count_elmo
 
-            interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo)
+            interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo/interval_fixation_count_elmo if interval_fixation_count_elmo != 0 else 0)
             interval_data['fixations_counts_elmo'].append(interval_fixation_count_elmo)
             interval_data['accumulate_fixation_durations_elmo'].append(acc_interval_fixation_duration_elmo)
             interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)
@@ -893,7 +906,7 @@ class FixationFilter():
 
     def save_data(self):
         # write to a csv file
-        with open('tracker_results.csv', 'a', newline='') as file:
+        with open('tracker_results-by-decision.csv', 'a', newline='') as file:
             writer = csv.writer(file)
             game_time = self.time[-1] - self.time[0]
             writer.writerow([self.id, self.final_fixation_count, self.final_fixation_count_elmo, self.average_fixation_duration, self.average_fixation_duration_elmo, self.total_fixation_duration, self.total_fixation_duration_elmo, game_time])
@@ -1206,9 +1219,9 @@ if __name__ == '__main__':
     end_times = game_data['end_datetime']
     identification = game_data['ID']
 
-    task_data = pd.read_csv('task-times-by-task.csv')
+    task_data = pd.read_csv('task-times-by-decision.csv')
 
-    with open('tracker_results.csv', 'a', newline='') as file:
+    with open('tracker_results-by-decision.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['ID', 'computer_fixation_count', 'elmo_fixation_count', 'computer_average_fixation_duration', 'elmo_average_fixation_duration', 'computer_total_fixation_duration', 'elmo_total_fixation_duration', 'game_time'])
 
@@ -1228,6 +1241,7 @@ if __name__ == '__main__':
         else:
             file2 = files[0]
             file = files[1]
+
         print(user)
         print(file)
         print(file2)
@@ -1253,7 +1267,6 @@ if __name__ == '__main__':
 
 
 
-
     # 1. Example of fixation data of Elmo and computer screen in a time frame
     # 2. Heatmap of fixations of Elmo and computer screen
 
@@ -1264,8 +1277,3 @@ if __name__ == '__main__':
 
 
     
-
-
-
-
-  

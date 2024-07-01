@@ -438,7 +438,7 @@ def plot_average_duration_over_task(o_data, ox_data):
     plt.plot(task[0:17], o_array_fixation_durations[0:17], marker = 'o', linestyle = '--', color='b', label='O')
     plt.plot(task[0:17], ox_array_fixation_durations[0:17], marker = 'o', linestyle = '--', color='k', label='OX')
     plt.xlim(-1, 15)
-    plt.xticks(np.arange(-1, 15, 1))
+    plt.xticks(np.arange(-1, 16, 1))
     # Add labels and title
     plt.xlabel('Task')
     plt.ylabel('Computer Fixation Duration [s]')
@@ -455,7 +455,7 @@ def plot_average_duration_over_task(o_data, ox_data):
     # plot in axis x = task -1 is introduction 
     # plot in axis x = task 0 is tutorial task
     plt.xlim(-1, 15)
-    plt.xticks(np.arange(-1, 15, 1))
+    plt.xticks(np.arange(-1, 16, 1))
     # Add labels and title
     plt.xlabel('Task')
     plt.ylabel('Elmo Fixation Duration [s]')
@@ -467,7 +467,6 @@ def plot_average_duration_over_task(o_data, ox_data):
     # Show the plot
     plt.tight_layout()
     plt.savefig('results/elmo_average_fixation_durations_over_task.png', dpi=1200, bbox_inches='tight')
-
 
 def plot_average_count_over_task(o_data, ox_data):
     N = 14
@@ -499,7 +498,7 @@ def plot_average_count_over_task(o_data, ox_data):
     plt.plot(task[0:17], o_array_fixation_counts[0:17], marker = 'o', linestyle = '--', color='b', label='O')
     plt.plot(task[0:17], ox_array_fixation_counts[0:17], marker = 'o', linestyle = '--', color='k', label='OX')
     plt.xlim(-1, 15)
-    plt.xticks(np.arange(-1, 15, 1))
+    plt.xticks(np.arange(-1, 16, 1))
     # Add labels and title
     plt.xlabel('Task')
     plt.ylabel('Computer Fixation Count')
@@ -513,7 +512,7 @@ def plot_average_count_over_task(o_data, ox_data):
     plt.plot(task[0:17], o_array_fixation_counts_elmo[0:17], marker = 'o', linestyle = '--', color='b', label='O')
     plt.plot(task[0:17], ox_array_fixation_counts_elmo[0:17], marker = 'o', linestyle = '--', color='k', label='OX')
     plt.xlim(-1, 15)
-    plt.xticks(np.arange(-1, 15, 1))
+    plt.xticks(np.arange(-1, 16, 1))
     # Add labels and title
     plt.xlabel('Task')
     plt.ylabel('Elmo Fixation Count')
@@ -523,15 +522,6 @@ def plot_average_count_over_task(o_data, ox_data):
     
     plt.tight_layout()
     plt.savefig('results/elmo_average_fixation_counts_over_task.png', dpi=1200, bbox_inches='tight')
-
-
-
-    
-
-
-
-
-
 
 def plot_duration_over_time(data):
     value = data[data['id'] == 'O20']
@@ -559,7 +549,7 @@ def plot_duration_over_time(data):
 
 
 if __name__ == '__main__':
-    file = 'tracker_results_final.csv'
+    file = 'tracker_results_final_XAI_numeric.csv'
     df = pd.read_csv(file)
 
     o_data = df[df['ID'].str.startswith('O')]
@@ -586,14 +576,12 @@ if __name__ == '__main__':
     # plot_average_durations_over_time(o_data, ox_data)
 
     file3 = 'fixation_data_by_tasks.csv'
-
     df = pd.read_csv(file3)
     o_data = df[df['id'].isin(condition_o)]
     ox_data = df[df['id'].isin(condition_ox)]
     plot_average_duration_over_task(o_data, ox_data)
     plot_average_count_over_task(o_data, ox_data)
 
-
-    # plt.show()
+    plt.show()
 
 
