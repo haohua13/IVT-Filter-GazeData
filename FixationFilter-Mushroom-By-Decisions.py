@@ -705,6 +705,7 @@ class FixationFilter():
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
                 intervals.append((previous_start, closest_index, task))
                 previous_start = closest_index
+                
             # elif self.task_data['event'][i] == 'end_human_ai_decision' and i>8:
             #     print('End Human-AI Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
             #     closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))

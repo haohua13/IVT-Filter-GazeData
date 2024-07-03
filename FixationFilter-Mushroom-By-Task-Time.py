@@ -734,7 +734,7 @@ class FixationFilter():
             acc_interval_fixation_duration += interval_fixation_duration
             acc_interval_fixation_count += interval_fixation_count
 
-            interval_data['fixation_durations'].append(interval_fixation_duration)
+            interval_data['fixation_durations'].append(interval_fixation_duration/interval_fixation_count if interval_fixation_count != 0 else 0)
             interval_data['fixation_counts'].append(interval_fixation_count)
             interval_data['accumulate_fixation_durations'].append(acc_interval_fixation_duration)
             interval_data['accumulate_fixation_counts'].append(acc_interval_fixation_count)
@@ -746,7 +746,7 @@ class FixationFilter():
             acc_interval_fixation_duration_elmo += interval_fixation_duration_elmo
             acc_interval_fixation_count_elmo += interval_fixation_count_elmo
 
-            interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo)
+            interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo/interval_fixation_count if interval_fixation_count != 0 else 0)
             interval_data['fixations_counts_elmo'].append(interval_fixation_count_elmo)
             interval_data['accumulate_fixation_durations_elmo'].append(acc_interval_fixation_duration_elmo)
             interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)

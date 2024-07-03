@@ -295,7 +295,7 @@ def box_plot_time_tension(o_data, ox_data):
         writer.writerow(['relative_duration', mean_computer_ox, std_computer_ox, sem_computer_ox, median_computer_ox, 'Computer', 'OX'])
 
 def plot_count_over_time(data):
-    value = data[data['id'] == 'O20']
+    value = data[data['id'] == 'OX20']
     game_percentage = value['game_percentage']
     fixation_counts = value['fixation_counts']
     fixation_counts_elmo = value['fixations_counts_elmo']
@@ -524,7 +524,7 @@ def plot_average_count_over_task(o_data, ox_data):
     plt.savefig('results/elmo_average_fixation_counts_over_task.png', dpi=1200, bbox_inches='tight')
 
 def plot_duration_over_time(data):
-    value = data[data['id'] == 'O20']
+    value = data[data['id'] == 'OX20']
     game_percentage = value['game_percentage']
     fixation_duration = value['fixation_durations']
     fixation_duration_elmo = value['fixation_durations_elmo']
@@ -535,7 +535,7 @@ def plot_duration_over_time(data):
 
     # Add labels and title
     plt.xlabel('Task Progress [%]')
-    plt.ylabel('Fixation Duration [s]')
+    plt.ylabel('Avg. Fixation Duration [s]')
     plt.title('Fixation Duration Over Time')
     plt.grid(True)
     plt.legend()
@@ -562,10 +562,10 @@ if __name__ == '__main__':
     # box_plot_count_tension(o_data, ox_data)
     # box_plot_time_tension(o_data, ox_data)
 
-    file2 = 'fixation_data_by_time_percentage.csv'
+    file2 = 'interval_data_by_tasks_with_average_durations.csv'
     df = pd.read_csv(file2)
-    # plot_count_over_time(df)
-    # plot_duration_over_time(df)
+    plot_count_over_time(df)
+    plot_duration_over_time(df)
 
     # get all o condition data
     o_data = df[df['id'].isin(condition_o)]
@@ -575,12 +575,12 @@ if __name__ == '__main__':
     # plot_average_counts_over_time(o_data, ox_data)
     # plot_average_durations_over_time(o_data, ox_data)
 
-    file3 = 'fixation_data_by_tasks.csv'
+    file3 = 'interval_data_by_tasks_with_average_durations.csv'
     df = pd.read_csv(file3)
     o_data = df[df['id'].isin(condition_o)]
     ox_data = df[df['id'].isin(condition_ox)]
-    plot_average_duration_over_task(o_data, ox_data)
-    plot_average_count_over_task(o_data, ox_data)
+    # plot_average_duration_over_task(o_data, ox_data)
+    # plot_average_count_over_task(o_data, ox_data)
 
     plt.show()
 
