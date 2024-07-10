@@ -986,11 +986,11 @@ if __name__ == '__main__':
     data_screen = pd.read_csv(file_screen)
     fixation_filter = FixationFilter(data_screen, filename_screen, data_elmo, filename_elmo)
     fixation_filter.process_data()
-    # fixation_filter.plot_gaze_and_velocity()
-    # fixation_filter.plot_gaze_and_velocity_elmo()
-    # fixation_filter.calculate_elmo_pixels()
-    # fixation_filter.plot_pixel_elmo()
-    # fixation_filter.plot_normalized_elmo()
-    # plt.show()
+    fixation_filter.plot_gaze_and_velocity()
+    fixation_filter.plot_gaze_and_velocity_elmo()
+    fixation_filter.calculate_elmo_pixels()
+    fixation_filter.plot_pixel_elmo()
+    fixation_filter.plot_normalized_elmo()
+    plt.show()
 
 
