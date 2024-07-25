@@ -1206,7 +1206,7 @@ if __name__ == '__main__':
     end_times = game_data['end_datetime']
     identification = game_data['ID']
 
-    task_data = pd.read_csv('task-times-by-task.csv')
+    task_data = pd.read_csv('mushroom_results/task-times-by-task.csv')
 
     with open('tracker_results.csv', 'a', newline='') as file:
         writer = csv.writer(file)
@@ -1250,7 +1250,6 @@ if __name__ == '__main__':
 
         fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user, current_task_data)
         fixation_filter.process_data()
-
 
 
 
