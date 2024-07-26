@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from matplotlib import pyplot, image
+import csv
+import pandas as pd
+
 def gaussian(x, sx, y= None, sy = None):
     """Returns an array of numpy arrays (a matrix) containing values between 1 and 0 in a 2D Gaussian distribution"""
 
@@ -175,7 +178,140 @@ def draw_heatmap(gazepoints, dispsize, imagefile=None, alpha=0.5, savefilename=N
 
     return fig
 
+def plot_heatmap_fixations(fixations, file, image_file, XAI, samples, window_size = (int(1920), int(1080)), computer_width =38, computer_height = 25, alpha = 0.5, gaussiannwh = 200, gaussiansd = 33):
+        '''Plot a heatmap of the fixations, taken from https://github.com/TobiasRoeddiger/GazePointHeatMap/blob/master/gazeheatplot.py'''
+        # gaussian kernel parameters
+        gwh = gaussiannwh
+        gsdwh = gaussiansd
+        gaus = gaussian(gwh, gsdwh)
 
+        # matrix of zeroes for heatmap
+        strt = int(gwh / 2)
+        heatmapsize = int(window_size[1] + 2 * strt), int(window_size[0] + 2 * strt)
+        heatmap = np.ones(heatmapsize, dtype=float)
+
+        # create heatmap
+        for fixation in fixations:
+            x = int(fixation['average_position_x']) 
+            y = int(fixation['average_position_y'])
+            # correct Gaussian size if fixation is outside of display boundaries
+            if (not 0 < x < window_size[0]) or (not 0 < y < window_size[1]):
+                hadj = [0, gwh]
+                vadj = [0, gwh]
+                if x < 0:
+                    hadj[0] = abs(x)
+                    x = 0
+                elif computer_width < x:
+                    hadj[1] = gwh - int(x - window_size[0])
+                if y < 0:
+                    vadj[0] = abs(y)
+                    y = 0
+                elif computer_height < y:
+                    vadj[1] = gwh - int(y - window_size[1])
+                
+                try: 
+                    heatmap[y:y + vadj[1], x:x + hadj[1]] += gaus[vadj[0]:vadj[1], hadj[0]:hadj[1]] * fixation['duration']
+                except:
+                    # fixation was probably outside of display
+                    pass
+            else:
+                # add Gaussian to the current heatmap
+                heatmap[y:y + gwh, x:x + gwh] += gaus * fixation['duration']
+        # resize heatmap
+        heatmap = heatmap[int(strt):int(window_size[1] + strt), int(strt):int(window_size[0] + strt)]
+
+        # remove zeros
+        lowbound = np.mean(heatmap[heatmap > 0])
+        heatmap[heatmap < lowbound] = 0
+
+        # plot heatmap
+        plt.figure()
+        # draw image file
+        image = plt.imread(image_file)
+        plt.imshow(image, extent=[0, window_size[0], 0, window_size[1]], alpha=0.5)
+
+        # draw heatmap on top of image
+        average_heatmap = heatmap/samples
+
+        plt.imshow(average_heatmap, cmap = 'viridis', alpha = alpha) 
+        # title 
+        plt.title('Heatmap of the fixations for XAI = {XAI} condition'.format(XAI = XAI))
+
+        # labels
+        plt.xlabel('X-axis Pixels')
+        plt.ylabel('Y-axis Pixels')
+        plt.xlim(0, window_size[0])
+        plt.ylim(0, window_size[1])
+
+        # plt.gca().invert_yaxis()  
+        plt.colorbar(label = 'Based on duration and position of fixations')
+
+        plt.grid()
+        plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 300)
+
+if __name__ == '__main__':
+    image_file = 'images/example-image-heatmap.png'
+    directory = 'gaze_data/fixation_data_heatmap/'
+    data_frames_o_condition = [] # just the screen
+    data_frames_ox_condition = [] # just the screen
+    fixations_O = []
+    fixations_OX = []
+    samples = 14
+    for file in os.listdir(directory):
+        if file.endswith('.csv') and 'O' in file and 'OX' not in file and 'elmo' not in file:
+            data = pd.read_csv(directory + file)
+            data_frames_o_condition.append(data)
+        elif file.endswith('.csv') and 'OX' in file and 'elmo' not in file:
+            data = pd.read_csv(directory + file)
+            data_frames_ox_condition.append(data)
+
+    if data_frames_o_condition:
+        combined_data_o = pd.concat(data_frames_o_condition, ignore_index=True)
+        for _, row in combined_data_o.iterrows():
+            fixation = {
+                'average_position_x': row['average_x'],
+                'average_position_y': row['average_y'],
+                'duration': row['duration']
+            }
+            fixations_O.append(fixation)
+        print(fixations_O)
+
+        XAI = False
+        plot_heatmap_fixations(fixations_O, 'O', image_file, XAI, samples)
+
+    if data_frames_ox_condition:
+        combined_data_ox = pd.concat(data_frames_ox_condition, ignore_index=True)
+        for _, row in combined_data_ox.iterrows():
+            fixation = {
+                'average_position_x': row['average_x'],
+                'average_position_y': row['average_y'],
+                'duration': row['duration']
+            }
+            fixations_OX.append(fixation)
+
+        XAI = True
+        plot_heatmap_fixations(fixations_OX, 'OX', image_file, XAI, samples)
+        plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+    
+
+    
 
     
 

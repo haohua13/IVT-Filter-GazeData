@@ -1023,19 +1023,19 @@ class FixationFilter():
         plt.grid()
 
     def plot_scanpath_fixations(self, fixations, file):
-
+        constant = 10
+        exponent = 1.2
         '''Plot the scan path of the fixations'''
         plt.figure()
         avg_x = [fixation['average_position_x'] for fixation in fixations]
         avg_y = [fixation['average_position_y'] for fixation in fixations]
-        
         # plot scan path
         plt.plot(avg_x, avg_y, color='black', label='Scan Path', linestyle = '--', alpha = 0.5)
         # annotate scatter points with their indices
         for i, (x, y) in enumerate(zip(avg_x, avg_y)):
             plt.text(x, y, str(i), fontsize=10, ha='center', va='center', color = 'black')
             duration = fixations[i]['duration']
-            plt.scatter(x, y, color='tab:green', alpha = 0.5, edgecolors = 'black', s = 60+5**(duration*2))
+            plt.scatter(x, y, color='tab:green', alpha = 0.5, edgecolors = 'black', s = constant+exponent**(duration*2))
 
         plt.xlabel('X-axis Pixels')
         plt.ylabel('Y-axis Pixels')
@@ -1074,10 +1074,17 @@ class FixationFilter():
         plt.title('IV-T Filter for fixations')
         plt.grid()
         # save high quality
-        plt.savefig('images/gaze_and_velocity_plot_'+ self.file + '.png', dpi = 300)
-        self.plot_heatmap_fixations(self.final_fixations, self.file)
-        self.plot_scanpath_fixations(self.final_fixations, self.file)
-        self.plot_fixation_map(self.final_fixations, self.file)
+        # plt.savefig('images/gaze_and_velocity_plot_'+ self.id + '.png', dpi = 300)
+
+        # save final_fixations to csv file
+        with open('gaze_data/fixation_data_heatmap/final_fixations_'+ self.id + '.csv', 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
+            for fixation in self.final_fixations:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+        # self.plot_heatmap_fixations(self.final_fixations, self.file)
+        # self.plot_scanpath_fixations(self.final_fixations, self.file)
+        # self.plot_fixation_map(self.final_fixations, self.file)
     
     def plot_gaze_and_velocity_elmo(self):
         plt.figure()
@@ -1108,10 +1115,19 @@ class FixationFilter():
         plt.title('IV-T Filter for fixations Elmo')
         plt.grid()
         # save high quality
-        plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
-        self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
-        self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
-        self.plot_fixation_map(self.final_fixations_elmo, self.file2)
+        # plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.id + '.png', dpi = 300)
+
+        # save final_fixations to csv file
+        with open('gaze_data/fixation_data_heatmap/final_fixations_elmo_'+ self.id + '.csv', 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
+            for fixation in self.final_fixations:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+
+
+        # self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
+        # self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
+        # self.plot_fixation_map(self.final_fixations_elmo, self.file2)
 
 
 if __name__ == '__main__':
@@ -1132,8 +1148,6 @@ if __name__ == '__main__':
     with open('tracker_results.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['ID', 'computer_fixation_count', 'elmo_fixation_count', 'computer_average_fixation_duration', 'elmo_average_fixation_duration', 'computer_total_fixation_duration', 'elmo_total_fixation_duration', 'game_time'])
-
-
 
     date_format = "%m/%d/%Y %I:%M:%S %p"
     for i in range(len(start_times)):
@@ -1168,7 +1182,8 @@ if __name__ == '__main__':
 
         fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user)
         fixation_filter.process_data()
-
+        fixation_filter.plot_gaze_and_velocity()
+        fixation_filter.plot_gaze_and_velocity_elmo()
 
     # Need to read all the data from the csv files, save them to another csv file
     # and then read them again to plot the data (average fixation duration, total fixation duration,

@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 from utils import gaussian, draw_display, draw_heatmap
+import csv
 
 class FixationFilter():
     def __init__(self, data, file, data2, file2):
@@ -806,7 +807,7 @@ class FixationFilter():
         plt.ylabel('Gaze position')
         plt.grid()
 
-    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 200, gaussiansd = 33):
+    def plot_heatmap_fixations(self, fixations, file, alpha = 0.5, gaussiannwh = 150, gaussiansd = 33):
 
         '''Plot a heatmap of the fixations, taken from https://github.com/TobiasRoeddiger/GazePointHeatMap/blob/master/gazeheatplot.py'''
         # gaussian kernel parameters
@@ -855,6 +856,10 @@ class FixationFilter():
 
         # plot heatmap
         plt.figure()
+        # draw image file
+        image = plt.imread('images/example-image-heatmap.png')
+        plt.imshow(image, extent=[0, self.window_size[0], 0, self.window_size[1]], alpha=1)
+
         plt.imshow(heatmap, cmap = 'viridis', alpha = alpha) 
         # title 
         plt.title('Heatmap of Fixations')
@@ -863,8 +868,10 @@ class FixationFilter():
         plt.ylabel('Y-axis Pixels')
         plt.xlim(0, self.window_size[0])
         plt.ylim(0, self.window_size[1])
-        plt.gca().invert_yaxis()  
+
+        # plt.gca().invert_yaxis()  
         plt.colorbar(label = 'Based on duration and position of fixation')
+
         plt.grid()
         plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 300)
 
@@ -941,9 +948,17 @@ class FixationFilter():
         plt.grid()
         # save high quality
         plt.savefig('images/gaze_and_velocity_plot_'+ self.file + '.png', dpi = 300)
+
+        # save final_fixations to csv file
+        with open('gaze_data/fixation_data_heatmap/final_fixations'+ self.file + '.csv', 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
+            for fixation in self.final_fixations:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+
         # self.plot_heatmap_fixations(self.final_fixations, self.file)
         # self.plot_scanpath_fixations(self.final_fixations, self.file)
-        self.plot_fixation_map(self.final_fixations, self.file)
+        # self.plot_fixation_map(self.final_fixations, self.file)
     
     def plot_gaze_and_velocity_elmo(self):
         plt.figure()
@@ -977,14 +992,22 @@ class FixationFilter():
         plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
 
         # In case we want to plot the heatmap, scanpath and fixation map for the elmo data
+
+        # save final_fixations to csv file
+        with open('gaze_data/fixation_data_heatmap/final_fixations'+ self.file2 + '.csv', 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
+            for fixation in self.final_fixations:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+
         # self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
         # self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
         # self.plot_fixation_map(self.final_fixations_elmo, self.file2)
 
 
 if __name__ == '__main__':
-    filename_elmo = 'gaze_data_OX22elmo10-05-12-14'
-    filename_screen = 'gaze_data_OX2210-05-12-14'
+    filename_elmo = 'gaze_data_OX23elmo16-05-10-22'
+    filename_screen = 'gaze_data_OX2316-05-10-22'
     file_elmo = 'gaze_data/' + filename_elmo + '.csv'
     file_screen = 'gaze_data/' + filename_screen + '.csv'
     data_elmo = pd.read_csv(file_elmo)
@@ -992,7 +1015,7 @@ if __name__ == '__main__':
     fixation_filter = FixationFilter(data_screen, filename_screen, data_elmo, filename_elmo)
     fixation_filter.process_data()
     fixation_filter.plot_gaze_and_velocity()
-    # fixation_filter.plot_gaze_and_velocity_elmo()
+    fixation_filter.plot_gaze_and_velocity_elmo()
     # fixation_filter.calculate_elmo_pixels()
     # fixation_filter.plot_pixel_elmo()
     # fixation_filter.plot_normalized_elmo()

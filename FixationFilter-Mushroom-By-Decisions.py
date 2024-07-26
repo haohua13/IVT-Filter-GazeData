@@ -1034,7 +1034,7 @@ class FixationFilter():
         plt.ylabel('Gaze position')
         plt.grid()
 
-    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 200, gaussiansd = 33):
+    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 50, gaussiansd = 33):
 
         '''Plot a heatmap of the fixations, taken from https://github.com/TobiasRoeddiger/GazePointHeatMap/blob/master/gazeheatplot.py'''
         # gaussian kernel parameters
@@ -1114,19 +1114,19 @@ class FixationFilter():
         plt.grid()
 
     def plot_scanpath_fixations(self, fixations, file):
-
+        constant = 10
+        exponent = 1.2
         '''Plot the scan path of the fixations'''
         plt.figure()
         avg_x = [fixation['average_position_x'] for fixation in fixations]
         avg_y = [fixation['average_position_y'] for fixation in fixations]
-        
         # plot scan path
         plt.plot(avg_x, avg_y, color='black', label='Scan Path', linestyle = '--', alpha = 0.5)
         # annotate scatter points with their indices
         for i, (x, y) in enumerate(zip(avg_x, avg_y)):
             plt.text(x, y, str(i), fontsize=10, ha='center', va='center', color = 'black')
             duration = fixations[i]['duration']
-            plt.scatter(x, y, color='tab:green', alpha = 0.5, edgecolors = 'black', s = 60+5**(duration*2))
+            plt.scatter(x, y, color='tab:green', alpha = 0.5, edgecolors = 'black', s = constant+exponent**(duration*2))
 
         plt.xlabel('X-axis Pixels')
         plt.ylabel('Y-axis Pixels')
@@ -1212,7 +1212,6 @@ if __name__ == '__main__':
     # file_screen = 'gaze_data/' + filename_screen + '.csv'
     # data_elmo = pd.read_csv(file_elmo)
     # data_screen = pd.read_csv(file_screen)
-
 
     game_file = 'gaze_data/data_behaviour_spss_elmo.csv' # contains the time frames of the game
     game_data = pd.read_csv(game_file)

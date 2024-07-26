@@ -1100,19 +1100,19 @@ class FixationFilter():
         plt.grid()
 
     def plot_scanpath_fixations(self, fixations, file):
-
+        constant = 10
+        exponent = 1.2
         '''Plot the scan path of the fixations'''
         plt.figure()
         avg_x = [fixation['average_position_x'] for fixation in fixations]
         avg_y = [fixation['average_position_y'] for fixation in fixations]
-        
         # plot scan path
         plt.plot(avg_x, avg_y, color='black', label='Scan Path', linestyle = '--', alpha = 0.5)
         # annotate scatter points with their indices
         for i, (x, y) in enumerate(zip(avg_x, avg_y)):
             plt.text(x, y, str(i), fontsize=10, ha='center', va='center', color = 'black')
             duration = fixations[i]['duration']
-            plt.scatter(x, y, color='tab:green', alpha = 0.5, edgecolors = 'black', s = 60+5**(duration*2))
+            plt.scatter(x, y, color='tab:green', alpha = 0.5, edgecolors = 'black', s = constant+exponent**(duration*2))
 
         plt.xlabel('X-axis Pixels')
         plt.ylabel('Y-axis Pixels')
