@@ -255,9 +255,13 @@ def plot_heatmap_fixations(fixations, file, XAI, samples, window_size = (int(192
         plt.savefig('images/heatmap_fixations'+ file + '.png', dpi = 1200)
 
 if __name__ == '__main__':
-    # directory = 'gaze_data/fixation_data_heatmap/'
-    directory_AI = 'gaze_data/fixation_data_heat_map_AI/'
 
+    directory= 'gaze_data/fixation_data_heat_map_reliance/'
+
+
+    # Only OX condition (XAI = True), check reliance groups
+    # Reliance, Underreliance, Overreliance, No Underreliance
+    
     data_frames_o_condition = [] # just the screen
     data_frames_ox_condition = [] # just the screen
     fixations_O = []
@@ -314,13 +318,3 @@ if __name__ == '__main__':
 
     
     
-    
-
-    
-
-    
-
-
-    
-
-

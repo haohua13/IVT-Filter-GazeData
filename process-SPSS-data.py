@@ -18,7 +18,11 @@ def get_spss_data(tracker_results):
     tracker_results.to_csv('tracker_results_final_XAI_numeric.csv', index=False)
 
 if __name__ == '__main__':
-    tracker_results = pd.read_csv('tracker_results_final_XAI_numeric.csv')
+    # tracker_results = pd.read_csv('tracker_results_final_XAI_numeric.csv')
+    group = pd.read_csv('gaze_data/reliance_groups/no_over_reliance_intervals.csv')
+    group['XAI_value'] = group['ID'].apply(get_XAI)
+    group.to_csv('gaze_data/reliance_groups/no_over_reliance_intervals.csv', index=False)
+    
 
 
 

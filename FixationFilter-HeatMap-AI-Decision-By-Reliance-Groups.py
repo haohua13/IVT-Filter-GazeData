@@ -4,105 +4,159 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import numpy as np
 from utils import gaussian, draw_display, draw_heatmap
+import os
 import csv
 
 class FixationFilter():
-    def __init__(self, data, file, data2, file2):
+    def __init__(self, data, data2, game_start, game_end, ID, task_data):
+
+        self.id = ID
+        self.task_data = task_data
 
         self.elmo_width = 20  # 18 + 2 tolerance
         self.elmo_height = 16 # 14 + 2 tolerance
+
         self.computer_width = 38
         self.computer_height = 25
         self.window_size = (int(1920), int(1080))
 
-        self.max_time_between_fixations = 0.075 # Komogortsev et al. 2010
-        self.max_angle_between_fixations = 0.5 # Komogortsev et al. 2010
-        self.fixation_duration_threshold = 0.060 # to remove fixations that are too short Komogortsev et al. 2010
+        # to merge or not to merge
+        self.max_time_between_fixations = 0.075 # Komogortsev et al. 2010 [3]
+        self.max_angle_between_fixations = 0.5 # Komogortsev et al. 2010 [3] and [20-22]
+        # also corresponds well with allowing short microsaccades and 
+        # other minor eye movements to take place during fixations without splitting them up [12]
+        
+        self.fixation_duration_threshold = 0.060 # to remove fixations that are too short 
+        # [3], [12], [20], [23] Komogortsev et al. 2010, 0.03 if we want higher
         self.velocity_threshold = 30 # Olsen et al 2012 I-VT fixation filter threshold
-        self.file = file
-        self.file2 = file2
 
-        self.fixation_count = 0
-        self.final_fixation_count = 0
-        self.saccades_count = 0
-        self.gaps_count = 0
+        self.window_length = 0.01666 # 16.(6) ms this is the velocity calculator window_length 
+
         self.fixations = []
         self.saccades = []
         self.gaps = []
 
-        self.left_gaze_point_3dx = data['LeftGazePoint3DX']
-        self.left_gaze_point_3dy = data['LeftGazePoint3DY']
-        self.left_gaze_point_3dz = data['LeftGazePoint3DZ']
-        self.right_gaze_point_3dx = data['RightGazePoint3DX']
-        self.right_gaze_point_3dy = data['RightGazePoint3DY']
-        self.right_gaze_point_3dz = data['RightGazePoint3DZ']
-        self.left_eye_position_3dx = data['LeftEyePosition3DX']
-        self.left_eye_position_3dy = data['LeftEyePosition3DY']
-        self.left_eye_position_3dz = data['LeftEyePosition3DZ']
-        self.right_eye_position_3dx = data['RightEyePosition3DX']
-        self.right_eye_position_3dy = data['RightEyePosition3DY']
-        self.right_eye_position_3dz = data['RightEyePosition3DZ']
-        self.left_normalized_x = data['LeftGazePoint2DX']
-        self.left_normalized_y = data['LeftGazePoint2DY']
-        self.right_normalized_x = data['RightGazePoint2DX']
-        self.right_normalized_y = data['RightGazePoint2DY']
+
+        filtered_data, filtered_data2 = self.filter_data_by_game_time(data, data2, game_start, game_end)
+
+        self.left_gaze_point_3dx = filtered_data['LeftGazePoint3DX']
+        self.left_gaze_point_3dy = filtered_data['LeftGazePoint3DY']
+        self.left_gaze_point_3dz = filtered_data['LeftGazePoint3DZ']
+        self.right_gaze_point_3dx = filtered_data['RightGazePoint3DX']
+        self.right_gaze_point_3dy = filtered_data['RightGazePoint3DY']
+        self.right_gaze_point_3dz = filtered_data['RightGazePoint3DZ']
+        self.left_eye_position_3dx = filtered_data['LeftEyePosition3DX']
+        self.left_eye_position_3dy = filtered_data['LeftEyePosition3DY']
+        self.left_eye_position_3dz = filtered_data['LeftEyePosition3DZ']
+        self.right_eye_position_3dx = filtered_data['RightEyePosition3DX']
+        self.right_eye_position_3dy = filtered_data['RightEyePosition3DY']
+        self.right_eye_position_3dz = filtered_data['RightEyePosition3DZ']
+        self.left_normalized_x = filtered_data['LeftGazePoint2DX']
+        self.left_normalized_y = filtered_data['LeftGazePoint2DY']
+        self.right_normalized_x = filtered_data['RightGazePoint2DX']
+        self.right_normalized_y = filtered_data['RightGazePoint2DY']
 
 
-        self.left_pixels_x = data['LeftGazePoint2DX']*self.window_size[0]
-        self.left_pixels_y = data['LeftGazePoint2DY']*self.window_size[1]
-        self.right_pixels_x = data['RightGazePoint2DX']*self.window_size[0]
-        self.right_pixels_y = data['RightGazePoint2DY']*self.window_size[1]
+        self.left_pixels_x = filtered_data['LeftGazePoint2DX']*self.window_size[0]
+        self.left_pixels_y = filtered_data['LeftGazePoint2DY']*self.window_size[1]
+        self.right_pixels_x = filtered_data['RightGazePoint2DX']*self.window_size[0]
+        self.right_pixels_y = filtered_data['RightGazePoint2DY']*self.window_size[1]
         
-        self.time_stamp = data['SystemTimestamp']
-        self.left_validity = data['LeftValidity']
-        self.right_validity = data['RightValidity']
+        # self.time_stamp = filtered_data['SystemTimestamp']
+        self.left_validity = filtered_data['LeftValidity']
+        self.right_validity = filtered_data['RightValidity']
 
-        self.left_gaze_point_3dx_elmo = data2['LeftGazePoint3DX']
-        self.left_gaze_point_3dy_elmo = data2['LeftGazePoint3DY']
-        self.left_gaze_point_3dz_elmo = data2['LeftGazePoint3DZ']
-        self.right_gaze_point_3dx_elmo = data2['RightGazePoint3DX']
-        self.right_gaze_point_3dy_elmo = data2['RightGazePoint3DY']
-        self.right_gaze_point_3dz_elmo = data2['RightGazePoint3DZ']
-        self.left_eye_position_3dx_elmo = data2['LeftEyePosition3DX']
-        self.left_eye_position_3dy_elmo = data2['LeftEyePosition3DY']
-        self.left_eye_position_3dz_elmo = data2['LeftEyePosition3DZ']
-        self.right_eye_position_3dx_elmo = data2['RightEyePosition3DX']
-        self.right_eye_position_3dy_elmo = data2['RightEyePosition3DY']
-        self.right_eye_position_3dz_elmo = data2['RightEyePosition3DZ']
-        self.left_normalized_x_elmo = data2['LeftGazePoint2DX']
-        self.left_normalized_y_elmo = data2['LeftGazePoint2DY']
-        self.right_normalized_x_elmo = data2['RightGazePoint2DX']
-        self.right_normalized_y_elmo = data2['RightGazePoint2DY']
+        self.left_gaze_point_3dx_elmo = filtered_data2['LeftGazePoint3DX']
+        self.left_gaze_point_3dy_elmo = filtered_data2['LeftGazePoint3DY']
+        self.left_gaze_point_3dz_elmo = filtered_data2['LeftGazePoint3DZ']
+        self.right_gaze_point_3dx_elmo = filtered_data2['RightGazePoint3DX']
+        self.right_gaze_point_3dy_elmo = filtered_data2['RightGazePoint3DY']
+        self.right_gaze_point_3dz_elmo = filtered_data2['RightGazePoint3DZ']
+        self.left_eye_position_3dx_elmo = filtered_data2['LeftEyePosition3DX']
+        self.left_eye_position_3dy_elmo = filtered_data2['LeftEyePosition3DY']
+        self.left_eye_position_3dz_elmo = filtered_data2['LeftEyePosition3DZ']
+        self.right_eye_position_3dx_elmo = filtered_data2['RightEyePosition3DX']
+        self.right_eye_position_3dy_elmo = filtered_data2['RightEyePosition3DY']
+        self.right_eye_position_3dz_elmo = filtered_data2['RightEyePosition3DZ']
+        self.left_normalized_x_elmo = filtered_data2['LeftGazePoint2DX']
+        self.left_normalized_y_elmo = filtered_data2['LeftGazePoint2DY']
+        self.right_normalized_x_elmo = filtered_data2['RightGazePoint2DX']
+        self.right_normalized_y_elmo = filtered_data2['RightGazePoint2DY']
 
-        self.left_pixels_x_elmo =  data2['LeftGazePoint2DX']*self.window_size[0]
+        self.left_pixels_x_elmo =  filtered_data2['LeftGazePoint2DX']*self.window_size[0]
         # self.left_pixels_x_elmo = self.window_size[0] - self.left_pixels_x_elmo // 2
 
-        self.left_pixels_y_elmo = data2['LeftGazePoint2DY']*self.window_size[1]
+        self.left_pixels_y_elmo = filtered_data2['LeftGazePoint2DY']*self.window_size[1]
         # self.left_pixels_y_elmo = self.window_size[1] - self.left_pixels_y_elmo // 2
 
-        self.right_pixels_x_elmo = data2['RightGazePoint2DX']*self.window_size[0]
+        self.right_pixels_x_elmo = filtered_data2['RightGazePoint2DX']*self.window_size[0]
         # self.right_pixels_x_elmo = self.window_size[0] - self.right_pixels_x_elmo // 2
 
-        self.right_pixels_y_elmo = data2['RightGazePoint2DY']*self.window_size[1]
+        self.right_pixels_y_elmo = filtered_data2['RightGazePoint2DY']*self.window_size[1]
         # self.right_pixels_y_elmo = self.window_size[1] - self.right_pixels_x_elmo // 2
+
+        self.left_validity_elmo = filtered_data2['LeftValidity']
+        self.right_validity_elmo = filtered_data2['RightValidity']
+
 
         # self.time_stamp_elmo = data2['SystemTimestamp']
 
         # use computer timestamp
 
-        self.time_stamp_elmo = data2['ComputerTimestamp']
-        self.time_stamp = data['ComputerTimestamp']
+        self.time_stamp_elmo = filtered_data2['ComputerTimestamp']
+        self.time_stamp = filtered_data['ComputerTimestamp']
 
-        if self.time_stamp_elmo[0] > self.time_stamp[0]: # if elmo recording starts later than computer recording
-            self.time = (self.time_stamp - self.time_stamp[0])
-            self.time_elmo = (self.time_stamp_elmo - self.time_stamp[0])
-        else:
-            self.time = (self.time_stamp - self.time_stamp_elmo[0])
-            self.time_elmo = (self.time_stamp_elmo - self.time_stamp_elmo[0])
-        
-        
-        self.left_validity_elmo = data2['LeftValidity']
-        self.right_validity_elmo = data2['RightValidity']
+        # This is not necessary after game time
+        # if self.time_stamp_elmo[0] > self.time_stamp[0]: # if elmo recording starts later than computer recording
+        #     self.time = (self.time_stamp - self.time_stamp[0])
+        #     self.time_elmo = (self.time_stamp_elmo - self.time_stamp[0])
+        # else:
+        #     self.time = (self.time_stamp - self.time_stamp_elmo[0])
+        #     self.time_elmo = (self.time_stamp_elmo - self.time_stamp_elmo[0])
+
+        self.time = self.time_stamp + 2 - self.time_stamp[0] # feedback delay
+        self.time_elmo = self.time_stamp_elmo + 2 - self.time_stamp[0] # feedback delay
+
+        self.task_data['timestamp'] = self.task_data['timestamp'] - self.task_data['timestamp'][0]
+
+        # Data to save
+        self.fixation_count = 0
+        self.fixation_count_elmo = 0
+        self.average_fixation_duration = 0
+        self.average_fixation_duration_elmo = 0
+        self.total_fixation_duration = 0
+        self.total_fixation_duration_elmo = 0
+
+
+    def filter_data_by_game_time(self, data, data2, game_start, game_end):
+        """Filter the data to only include timestamps within game_start and game_end"""
+
+        # Convert timestamps to numpy arrays for element-wise comparison
+        data['ComputerTimestamp'] = np.array(data['ComputerTimestamp'])
+        data2['ComputerTimestamp'] = np.array(data2['ComputerTimestamp'])
+
+        # Filter computer data
+        within_game_time = (data['ComputerTimestamp'] >= game_start) & (data['ComputerTimestamp'] <= game_end)
+        filtered_data = {k: np.array(v)[within_game_time] for k, v in data.items()}
+
+        # Filter elmo data
+        print('Game Start: ', game_start)
+        print('Game End: ', game_end)
+        print('Elmo Start: ', data2['ComputerTimestamp'][0])
+        # get last elmo timestamp
+        print('Elmo End: ', data2['ComputerTimestamp'][len(data2['ComputerTimestamp'])-1])
+        if self.id == 'O33' or self.id == 'O34' or self.id == 'OX33' or self.id == 'OX34': # these data has 1 hour difference, so add 3600 to all timestamps
+            print('Adding 3600 to all timestamps')
+            data2['ComputerTimestamp'] = data2['ComputerTimestamp'] + 3600
+
+        within_game_time_elmo = (data2['ComputerTimestamp'] >= game_start) & (data2['ComputerTimestamp'] <= game_end)
+        filtered_data2 = {k: np.array(v)[within_game_time_elmo] for k, v in data2.items()}
+
+        print('Initial Time: ', filtered_data['ComputerTimestamp'][0])
+        print('Initial Time Elmo: ',filtered_data2['ComputerTimestamp'][0])
+
+        return filtered_data, filtered_data2
+    
              
     def process_data(self, method = 'average', filter_method = 'moving_average', alpha = 0.5, window_size = 5):
         '''Process the data by selecting the eye to use, filtering the data and calculating the velocity'''
@@ -115,13 +169,11 @@ class FixationFilter():
         self.velocity_calculator()
         self.average_velocity_calculator()
         self.average_velocity_calculator_elmo()
-        # print velocities that are not nan
-        print('Velocity', self.velocity[~np.isnan(self.velocity)])
-        print('Velocity Elmo', self.velocity_elmo[~np.isnan(self.velocity_elmo)])
-
+        print(self.velocity)
         self.classifications, self.fixations, self.saccades, self.gaps, self.fixation_count, self.saccades_count, self.gaps_count = self.velocity_classifier(self.velocity, self.time)
         self.classifications_elmo, self.fixations_elmo, self.saccades_elmo, self.gaps_elmo, self.fixation_count_elmo, self.saccades_count_elmo, self.gaps_count_elmo = self.velocity_classifier(self.velocity_elmo, self.time_elmo)
         self.process_fixations()  
+        self.save_data()
 
     def safe_nanmean(self, arrays, axis=0):
         combined = np.array(arrays)
@@ -199,7 +251,6 @@ class FixationFilter():
             if method =='strict_average':
                 # check validity of both eyes
                 valid_data_mask = (self.left_validity == 1) & (self.right_validity == 1)
-                valid_data_mask_elmo = (self.left_validity_elmo == 1) & (self.right_validity_elmo == 1)
                 # apply mask to filter out invalid data points
                 self.gaze_point_x[~valid_data_mask] = np.nan
                 self.gaze_point_y[~valid_data_mask] = np.nan
@@ -403,11 +454,7 @@ class FixationFilter():
         # calculate cosine of the angle between the gaze vector and eye position
         cosine_theta = dot_product / (eye_position_magnitude * gaze_vector_magnitude)
         self.theta = np.degrees(np.arccos(cosine_theta))
-        # calculate the velocity as the rate of change of the angle
         self.velocity = np.gradient(self.theta, self.time)
-        # print all thetas that are not nan
-        print('Theta', self.theta[~np.isnan(self.theta)])
-        
 
         eye_positions_elmo = np.column_stack((self.eye_position_x_elmo, self.eye_position_y_elmo, self.eye_position_z_elmo))
         gaze_positions_elmo = np.column_stack((self.gaze_point_x_elmo, self.gaze_point_y_elmo, self.gaze_point_z_elmo))
@@ -456,7 +503,7 @@ class FixationFilter():
         window_size = int(window_length / np.mean(np.diff(self.time_elmo)))
         # calculate the average velocity
         for i in range(len(self.gaze_point_x_elmo)):
-            # Determine start and end indices of the window
+            # determine start and end indices of the window
             start_index = max(0, i - window_size // 2)
             end_index = min(len(self.gaze_point_x_elmo) - 1, i + window_size // 2)
             if end_index - start_index + 1 >= 2:
@@ -507,6 +554,7 @@ class FixationFilter():
         start_fixation = None
         start_saccade = None
         start_gap = None
+
         for i in range(len(velocity)):
             if not(np.isnan(velocity[i])):
                 if abs(velocity[i]) < self.velocity_threshold:
@@ -623,11 +671,191 @@ class FixationFilter():
         self.final_fixations_elmo, self.final_fixation_count_elmo = self.discard_fixations(self.merged_fixations_elmo, self.classifications_elmo, self.pixels_x_elmo, self.pixels_y_elmo, self.time_elmo)
         self.total_fixation_duration_elmo = np.sum([fixation['duration'] for fixation in self.final_fixations_elmo])
         self.average_fixation_duration_elmo = self.total_fixation_duration_elmo / self.final_fixation_count_elmo
+        
+        # self.fixations_over_task()
+        # self.fixations_over_time()
+
+        self.calculate_fixations_ai_decision()
 
         print('TOTAL FIXATION DURATION:', self.total_fixation_duration)
         print('AVERAGE FIXATION DURATION:', self.average_fixation_duration)
         print('TOTAL FIXATION DURATION ELMO:', self.total_fixation_duration_elmo)
         print('AVERAGE FIXATION DURATION ELMO:', self.average_fixation_duration_elmo)
+
+    def calculate_task_intervals(self):
+        '''Calculate the start and end of each task interval'''
+        intervals = []
+        previous_start = None
+        print(len(self.task_data))
+        task = 1
+        # remove indexing of the task_data
+        for i in range(len(self.task_data)):
+            print('Task:', i)
+            if self.task_data['event'][i] == 'click_to_tutorial': # first task
+                print('User clicked to Tutorial:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((0, closest_index, -1, "click_to_tutorial"))
+                print(self.time[closest_index])
+                previous_start = closest_index
+            elif self.task_data['event'][i] == 'tutorial_task':
+                print('User finished Tutorial Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((previous_start, closest_index, 0, "tutorial"))
+                previous_start = closest_index
+
+            elif self.task_data['event'][i] == 'end_human_decision' and i>8:
+                print('End Human Task/Start AI-Human Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((previous_start, closest_index, task, "end_human_decision"))
+                previous_start = closest_index
+
+            elif self.task_data['event'][i] == 'feedback' and i>8:
+                print('Feedback/End Of Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
+                closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
+                intervals.append((previous_start, closest_index, task, "feedback"))
+                previous_start = closest_index
+                task = task + 1
+            print('Intervals:', intervals)
+        return intervals
+
+    def calculate_fixations_ai_decision(self):
+        '''Calculate the fixations during the AI decision task'''
+        intervals = self.calculate_task_intervals()
+        relevant_intervals =[] # "end_human_decision" and "feedback"
+        for start, end, task, task_name in intervals:
+            if task_name == "end_human_decision" or task_name == "feedback":
+                relevant_intervals.append((start, end, task, task_name))
+        print('Relevant Intervals:', relevant_intervals)
+        # calculate fixations during the AI decision task
+        self.ai_decision_fixations = []
+        self.ai_decision_fixations_elmo = []
+        for start, end, task, task_name in relevant_intervals:
+            for fixation in self.final_fixations:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    # also add the task number to fixation
+                    fixation['task'] = task
+                    self.ai_decision_fixations.append(fixation)
+            for fixation in self.final_fixations_elmo:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    fixation['task'] = task
+                    self.ai_decision_fixations_elmo.append(fixation)
+        print('AI Decision Fixations:', self.ai_decision_fixations)
+        print('AI Decision Fixations Elmo:', self.ai_decision_fixations_elmo)
+
+    def fixations_over_task(self):
+        
+        interval_data = {'id': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixations_counts_elmo': [], 
+                         'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixations_counts_elmo': [], 'game_percentage': [], 'task': []}
+
+        acc_interval_fixation_duration = 0
+        acc_interval_fixation_count = 0
+        acc_interval_fixation_duration_elmo = 0
+        acc_interval_fixation_count_elmo = 0
+        total_time = int(len(self.time))
+
+        intervals = self.calculate_task_intervals()
+
+        for start, end, task, task_name in intervals:
+            interval_fixation_duration = 0
+            interval_fixation_count = 0
+            interval_fixation_duration_elmo = 0
+            interval_fixation_count_elmo = 0
+
+            print('Start:', start, 'End:', end, 'Task:', task)
+            for fixation in self.final_fixations:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    interval_fixation_duration += fixation['duration']
+                    interval_fixation_count += 1
+            acc_interval_fixation_duration += interval_fixation_duration
+            acc_interval_fixation_count += interval_fixation_count
+
+            interval_data['fixation_durations'].append(interval_fixation_duration/interval_fixation_count if interval_fixation_count != 0 else 0)
+            interval_data['fixation_counts'].append(interval_fixation_count)
+            interval_data['accumulate_fixation_durations'].append(acc_interval_fixation_duration)
+            interval_data['accumulate_fixation_counts'].append(acc_interval_fixation_count)
+
+            for fixation in self.final_fixations_elmo:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    interval_fixation_duration_elmo += fixation['duration']
+                    interval_fixation_count_elmo += 1
+            acc_interval_fixation_duration_elmo += interval_fixation_duration_elmo
+            acc_interval_fixation_count_elmo += interval_fixation_count_elmo
+
+            interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo/interval_fixation_count_elmo if interval_fixation_count_elmo != 0 else 0)
+            interval_data['fixations_counts_elmo'].append(interval_fixation_count_elmo)
+            interval_data['accumulate_fixation_durations_elmo'].append(acc_interval_fixation_duration_elmo)
+            interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)
+            interval_data['game_percentage'].append(end/total_time*100)
+            interval_data['task'].append(task)
+            
+        self.interval_data = interval_data
+        print('INTERVAL DATA:', self.interval_data)
+        self.write_to_file()
+
+
+
+    def fixations_over_time(self, interval = 20):
+        # obtain fixation over time data
+        total_time = int(len(self.time))
+        interval_size = total_time // interval
+        intervals = [(i * interval_size, (i + 1) * interval_size) for i in range(20)]
+        interval_data = {'id': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixations_counts_elmo': [], 
+                         'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixations_counts_elmo': [], 'game_percentage': []}
+        acc_interval_fixation_duration = 0
+        acc_interval_fixation_count = 0
+        acc_interval_fixation_duration_elmo = 0
+        acc_interval_fixation_count_elmo = 0
+        
+        for start, end in intervals:
+            interval_fixation_duration = 0
+            interval_fixation_count = 0
+            interval_fixation_duration_elmo = 0
+            interval_fixation_count_elmo = 0
+
+            print('Start:', start, 'End:', end)
+            for fixation in self.final_fixations:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    interval_fixation_duration += fixation['duration']
+                    interval_fixation_count += 1
+            
+            acc_interval_fixation_duration += interval_fixation_duration
+            acc_interval_fixation_count += interval_fixation_count
+                
+            interval_data['fixation_durations'].append(interval_fixation_duration)
+            interval_data['fixation_counts'].append(interval_fixation_count)
+            interval_data['accumulate_fixation_durations'].append(acc_interval_fixation_duration)
+            interval_data['accumulate_fixation_counts'].append(acc_interval_fixation_count)
+
+            for fixation in self.final_fixations_elmo:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    interval_fixation_duration_elmo += fixation['duration']
+                    interval_fixation_count_elmo += 1
+            acc_interval_fixation_count_elmo += interval_fixation_count_elmo
+            acc_interval_fixation_duration_elmo += interval_fixation_duration_elmo
+            
+            interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo)
+            interval_data['fixations_counts_elmo'].append(interval_fixation_count_elmo)
+            interval_data['accumulate_fixation_durations_elmo'].append(acc_interval_fixation_duration_elmo)
+            interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)
+            interval_data['game_percentage'].append(end/total_time*100)
+
+        self.interval_data = interval_data
+
+        print('INTERVAL DATA:', self.interval_data)
+        self.write_to_file()
+    
+    def write_to_file(self):
+        # Convert interval_data to DataFrame
+        df = pd.DataFrame(self.interval_data)
+        # if file already exists, append to it
+        if os.path.exists('interval_data.csv'):
+            df.to_csv('interval_data.csv', mode='a', header=False, index=False)
+        else:
+            # Write DataFrame to CSV
+            df.to_csv('interval_data.csv', index=False)
+
+        print('Data written to interval_data.csv')
+
 
     def merge_fixations(self, fixations, time, theta):
         '''Merge fixations that are close to each other, minimum time and angle between fixations'''
@@ -693,6 +921,14 @@ class FixationFilter():
         self.normalized_elmo_agent_size = (self.elmo_width/self.computer_width, self.elmo_height/self.computer_height)
         center = (0.5, 0.5)
         self.normalized_elmo_agent_position = (center[0] - self.normalized_elmo_agent_size[0]/2, center[0] - self.normalized_elmo_agent_size[1]/2)
+
+    def save_data(self):
+        # write to a csv file
+        with open('tracker_results-by-decision.csv', 'a', newline='') as file:
+            writer = csv.writer(file)
+            game_time = self.time[-1] - self.time[0]
+            writer.writerow([self.id, self.final_fixation_count, self.final_fixation_count_elmo, self.average_fixation_duration, self.average_fixation_duration_elmo, self.total_fixation_duration, self.total_fixation_duration_elmo, game_time])
+    
 
     def plot_normalized_elmo(self):
         fig, ax = plt.subplots()
@@ -815,7 +1051,7 @@ class FixationFilter():
         plt.ylabel('Gaze position')
         plt.grid()
 
-    def plot_heatmap_fixations(self, fixations, file, alpha = 0.5, gaussiannwh = 150, gaussiansd = 33):
+    def plot_heatmap_fixations(self, fixations, file, alpha = 1, gaussiannwh = 50, gaussiansd = 33):
 
         '''Plot a heatmap of the fixations, taken from https://github.com/TobiasRoeddiger/GazePointHeatMap/blob/master/gazeheatplot.py'''
         # gaussian kernel parameters
@@ -864,10 +1100,6 @@ class FixationFilter():
 
         # plot heatmap
         plt.figure()
-        # draw image file
-        image = plt.imread('images/example-image-heatmap.png')
-        plt.imshow(image, extent=[0, self.window_size[0], 0, self.window_size[1]], alpha=1)
-
         plt.imshow(heatmap, cmap = 'viridis', alpha = alpha) 
         # title 
         plt.title('Heatmap of Fixations')
@@ -876,10 +1108,8 @@ class FixationFilter():
         plt.ylabel('Y-axis Pixels')
         plt.xlim(0, self.window_size[0])
         plt.ylim(0, self.window_size[1])
-
-        # plt.gca().invert_yaxis()  
+        plt.gca().invert_yaxis()  
         plt.colorbar(label = 'Based on duration and position of fixation')
-
         plt.grid()
         plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 300)
 
@@ -887,14 +1117,11 @@ class FixationFilter():
         '''Plot the fixation map of the fixations, size of scatter depends on duration of fixation'''
         plt.figure()
         i = 0
-        constant = 10
-        exponent = 1.2
         for fixation in fixations:
-            print(fixation)
             duration = fixation['duration']
             avg_x = fixation['average_position_x']
             avg_y = fixation['average_position_y']
-            plt.scatter(avg_x, avg_y, color='tab:green', s = constant+exponent**(duration*2), alpha = 0.5)
+            plt.scatter(avg_x, avg_y, color='tab:green', s = 60+5**(duration*2), alpha = 0.5)
             plt.text(avg_x, avg_y, str(i), fontsize=10, ha='center', va='center', color = 'black')
             i=i+1
         plt.xlabel('X-axis Pixels')
@@ -955,14 +1182,14 @@ class FixationFilter():
         plt.title('IV-T Filter for fixations')
         plt.grid()
         # save high quality
-        plt.savefig('images/gaze_and_velocity_plot_'+ self.file + '.png', dpi = 300)
+        # plt.savefig('images/gaze_and_velocity_plot_'+ self.file + '.png', dpi = 300)
 
         # save final_fixations to csv file
-        with open('gaze_data/fixation_data_heatmap/final_fixations'+ self.file + '.csv', 'w', newline='') as file:
+        with open('gaze_data/fixation_data_heat_map_reliance/final_fixations'+ self.id + '.csv', 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
-            for fixation in self.final_fixations:
-                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time', 'task'])
+            for fixation in self.ai_decision_fixations:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time'], fixation['task']])
 
         # self.plot_heatmap_fixations(self.final_fixations, self.file)
         # self.plot_scanpath_fixations(self.final_fixations, self.file)
@@ -997,16 +1224,15 @@ class FixationFilter():
         plt.title('IV-T Filter for fixations Elmo')
         plt.grid()
         # save high quality
-        plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
-
-        # In case we want to plot the heatmap, scanpath and fixation map for the elmo data
+        # plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
 
         # save final_fixations to csv file
-        with open('gaze_data/fixation_data_heatmap/final_fixations'+ self.file2 + '.csv', 'w', newline='') as file:
+        with open('gaze_data/fixation_data_heat_map_reliance/final_fixations_elmo'+ self.id + '.csv', 'w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
-            for fixation in self.final_fixations_elmo:
-                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time', 'task'])
+            for fixation in self.ai_decision_fixations_elmo:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time'], fixation['task']])
+
 
         # self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
         # self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
@@ -1014,19 +1240,69 @@ class FixationFilter():
 
 
 if __name__ == '__main__':
-    filename_elmo = 'gaze_data_OX23elmo16-05-10-22'
-    filename_screen = 'gaze_data_OX2316-05-10-22'
-    file_elmo = 'gaze_data/' + filename_elmo + '.csv'
-    file_screen = 'gaze_data/' + filename_screen + '.csv'
-    data_elmo = pd.read_csv(file_elmo)
-    data_screen = pd.read_csv(file_screen)
-    fixation_filter = FixationFilter(data_screen, filename_screen, data_elmo, filename_elmo)
-    fixation_filter.process_data()
-    fixation_filter.plot_gaze_and_velocity()
-    fixation_filter.plot_gaze_and_velocity_elmo()
-    # fixation_filter.calculate_elmo_pixels()
-    # fixation_filter.plot_pixel_elmo()
-    # fixation_filter.plot_normalized_elmo()
-    # plt.show()
+    # filename_elmo = 'gaze_data_OX22elmo10-05-12-14'
+    # filename_screen = 'gaze_data_OX2210-05-12-14'
+    # file_elmo = 'gaze_data/' + filename_elmo + '.csv'
+    # file_screen = 'gaze_data/' + filename_screen + '.csv'
+    # data_elmo = pd.read_csv(file_elmo)
+    # data_screen = pd.read_csv(file_screen)
+
+    game_file = 'gaze_data/data_behaviour_spss_elmo.csv' # contains the time frames of the game
+    game_data = pd.read_csv(game_file)
+    start_times = game_data['start_datetime']
+    end_times = game_data['end_datetime']
+    identification = game_data['ID']
+
+    task_data = pd.read_csv('mushroom_data/task-times-by-decision.csv')
+
+    with open('tracker_results-by-decision.csv', 'a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(['ID', 'computer_fixation_count', 'elmo_fixation_count', 'computer_average_fixation_duration', 'elmo_average_fixation_duration', 'computer_total_fixation_duration', 'elmo_total_fixation_duration', 'game_time'])
+
+    date_format = "%m/%d/%Y %I:%M:%S %p"
+    for i in range(len(start_times)):
+        start_time = start_times[i]
+        end_time = end_times[i]
+        user = identification[i]
+        print(user)
+        if (user == 'O23' or user == 'OX30'): # 28 participants, 14 each condition
+            continue
+        # search userelmo and user gaze data in gaze_data
+        files = [f for f in os.listdir('gaze_data') if user in f]
+        if 'elmo' not in files[0]:
+            file = files[0]
+            file2 = files[1]
+        else:
+            file2 = files[0]
+            file = files[1]
+
+        print(user)
+        print(file)
+        print(file2)
+        print(start_time)
+
+        data_screen = pd.read_csv('gaze_data/' + file)
+        data_elmo = pd.read_csv('gaze_data/' + file2)
+        # Parse the date string into a datetime object
+        start_object = datetime.strptime(start_time, date_format)
+        end_object = datetime.strptime(end_time, date_format)
+
+        # Convert the datetime object to a timestamp
+        start_timestamp = start_object.timestamp()
+        end_timestamp = end_object.timestamp()
+
+        # obtain all timestamps and events from user in task_times.csv
+        current_task_data = task_data[task_data['ID'] == user]
+        print(current_task_data)
+        current_task_data = current_task_data.reset_index(drop=True)
+
+        fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user, current_task_data)
+        fixation_filter.process_data()
+        fixation_filter.plot_gaze_and_velocity()
+        fixation_filter.plot_gaze_and_velocity_elmo()
 
 
+
+
+
+    

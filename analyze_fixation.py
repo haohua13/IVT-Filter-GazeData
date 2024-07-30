@@ -546,8 +546,6 @@ def plot_duration_over_time(data):
 
 
 
-
-
 if __name__ == '__main__':
     file = 'tracker_results_final_XAI_numeric.csv'
     df = pd.read_csv(file)

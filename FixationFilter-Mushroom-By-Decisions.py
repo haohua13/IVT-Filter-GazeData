@@ -766,8 +766,8 @@ class FixationFilter():
             interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)
             interval_data['game_percentage'].append(end/total_time*100)
             interval_data['task'].append(task)
-            
 
+            
         self.interval_data = interval_data
         print('INTERVAL DATA:', self.interval_data)
         self.write_to_file()
@@ -836,8 +836,6 @@ class FixationFilter():
             df.to_csv('interval_data.csv', index=False)
 
         print('Data written to interval_data.csv')
-
-        
 
 
     def merge_fixations(self, fixations, time, theta):
@@ -1165,10 +1163,20 @@ class FixationFilter():
         plt.title('IV-T Filter for fixations')
         plt.grid()
         # save high quality
-        plt.savefig('images/gaze_and_velocity_plot_'+ self.file + '.png', dpi = 300)
-        self.plot_heatmap_fixations(self.final_fixations, self.file)
-        self.plot_scanpath_fixations(self.final_fixations, self.file)
-        self.plot_fixation_map(self.final_fixations, self.file)
+        # plt.savefig('images/gaze_and_velocity_plot_'+ self.file + '.png', dpi = 300)
+
+
+        # save final_fixations to csv file
+        with open('gaze_data/fixation_data_heatmap/final_fixations'+ self.id + '.csv', 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
+            for fixation in self.final_fixations:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+
+
+        # self.plot_heatmap_fixations(self.final_fixations, self.file)
+        # self.plot_scanpath_fixations(self.final_fixations, self.file)
+        # self.plot_fixation_map(self.final_fixations, self.file)
     
     def plot_gaze_and_velocity_elmo(self):
         plt.figure()
@@ -1199,10 +1207,19 @@ class FixationFilter():
         plt.title('IV-T Filter for fixations Elmo')
         plt.grid()
         # save high quality
-        plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
-        self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
-        self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
-        self.plot_fixation_map(self.final_fixations_elmo, self.file2)
+        # plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
+
+        # save final_fixations to csv file
+        with open('gaze_data/fixation_data_heatmap/final_fixations_elmo'+ self.id + '.csv', 'w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
+            for fixation in self.final_fixations_elmo:
+                writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
+
+
+        # self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
+        # self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
+        # self.plot_fixation_map(self.final_fixations_elmo, self.file2)
 
 
 if __name__ == '__main__':
@@ -1219,7 +1236,7 @@ if __name__ == '__main__':
     end_times = game_data['end_datetime']
     identification = game_data['ID']
 
-    task_data = pd.read_csv('task-times-by-decision.csv')
+    task_data = pd.read_csv('mushroom_data/task-times-by-decision.csv')
 
     with open('tracker_results-by-decision.csv', 'a', newline='') as file:
         writer = csv.writer(file)
@@ -1264,13 +1281,8 @@ if __name__ == '__main__':
 
         fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user, current_task_data)
         fixation_filter.process_data()
-
-
-
-    # 1. Example of fixation data of Elmo and computer screen in a time frame
-    # 2. Heatmap of fixations of Elmo and computer screen
-
-    
+        fixation_filter.plot_gaze_and_velocity()
+        fixation_filter.plot_gaze_and_velocity_elmo()
 
 
 
