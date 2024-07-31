@@ -405,6 +405,17 @@ class FixationFilter():
         self.theta = np.degrees(np.arccos(cosine_theta))
         # calculate the velocity as the rate of change of the angle
         self.velocity = np.gradient(self.theta, self.time)
+        delta_theta = np.diff(self.theta)
+        delta_time = np.diff(self.time)
+        self.velocity_v2 = delta_theta / delta_time
+
+        print(self.time[0])
+        print(self.time[1])
+        print(self.time[2])
+        print(self.time[3])
+        print(self.time[4])
+        print(self.time[5])
+
         # print all thetas that are not nan
         print('Theta', self.theta[~np.isnan(self.theta)])
         
@@ -445,6 +456,7 @@ class FixationFilter():
                 velocity = angle / time_difference
                 self.average_theta.append(angle)
                 self.average_velocity.append(velocity)
+                
             else:
                 self.average_velocity.append(np.nan)
                 self.average_theta.append(np.nan)

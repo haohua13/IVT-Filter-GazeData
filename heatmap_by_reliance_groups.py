@@ -258,10 +258,18 @@ if __name__ == '__main__':
 
     directory= 'gaze_data/fixation_data_heat_map_reliance/'
 
+    # append all individual dataframes into one dataframe
+
+    reliance_data = pd.read_csv('gaze_data/reliance_groups/groups.csv')
+
+    # remove 'O23' or user == 'OX30' from the dataset
+    reliance_data = reliance_data[~reliance_data['ID'].isin(['O23', 'OX30'])]
 
     # Only OX condition (XAI = True), check reliance groups
-    # Reliance, Underreliance, Overreliance, No Underreliance
-    
+    # Reliance, Underreliance, Overreliance, No Underreliance 
+
+
+
     data_frames_o_condition = [] # just the screen
     data_frames_ox_condition = [] # just the screen
     fixations_O = []
