@@ -476,7 +476,6 @@ if __name__ == '__main__':
     reliance_intervals['condition'] = reliance_intervals.apply(lambda row: get_group(row['reliance'], row['XAI_value']), axis=1)
     no_reliance_intervals['condition'] = no_reliance_intervals.apply(lambda row: get_group(row['reliance'], row['XAI_value']), axis=1)
 
-
     reliance_intervals.to_csv('gaze_data/reliance_groups/reliance_intervals.csv', index=False)
     no_reliance_intervals.to_csv('gaze_data/reliance_groups/no_reliance_intervals.csv', index=False)
 
@@ -518,7 +517,6 @@ if __name__ == '__main__':
 
     under_reliance_global = pd.concat([under_reliance_intervals, no_under_reliance_intervals])
     under_reliance_global.to_csv('gaze_data/reliance_groups/under_reliance_global.csv', index=False)
-
 
     # plot_underreliance(under_reliance_intervals, 'Underreliance', no_under_reliance_intervals, 'No Underreliance')
 

@@ -390,12 +390,12 @@ class FixationFilter():
     def velocity_calculator(self):
         '''Calculates the velocity as the rate of change of the angle between the gaze vector and the eye position vector. In degrees per second.'''
         # calculate velocity for data 1
-        eye_positions = np.column_stack((self.eye_position_x, self.eye_position_y, self.eye_position_z))
-        gaze_positions = np.column_stack((self.gaze_point_x, self.gaze_point_y, self.gaze_point_z))
+        eye_positions = np.column_stack((self.eye_position_x, self.eye_position_y, self.eye_position_z)) # 3-D Eye points
+        gaze_positions = np.column_stack((self.gaze_point_x, self.gaze_point_y, self.gaze_point_z)) # 3-D Gaze points
         # calculate the magnitude of the eye position
         eye_position_magnitude = np.linalg.norm(eye_positions, axis=1)
         # calculate the gaze vector
-        gaze_vectors = gaze_positions - eye_positions
+        gaze_vectors = gaze_positions - eye_positions 
         # calculate the magnitude of the gaze vector
         gaze_vector_magnitude = np.linalg.norm(gaze_vectors, axis=1)
         # calculate dot product of gaze vector and eye position
@@ -403,11 +403,13 @@ class FixationFilter():
         # calculate cosine of the angle between the gaze vector and eye position
         cosine_theta = dot_product / (eye_position_magnitude * gaze_vector_magnitude)
         self.theta = np.degrees(np.arccos(cosine_theta))
+
         # calculate the velocity as the rate of change of the angle
         self.velocity = np.gradient(self.theta, self.time)
         delta_theta = np.diff(self.theta)
         delta_time = np.diff(self.time)
         self.velocity_v2 = delta_theta / delta_time
+
 
         print(self.time[0])
         print(self.time[1])
@@ -417,8 +419,11 @@ class FixationFilter():
         print(self.time[5])
 
         # print all thetas that are not nan
-        print('Theta', self.theta[~np.isnan(self.theta)])
-        
+        # print('Theta', self.theta[~np.isnan(self.theta)])
+
+        # print first 10 velocities that are not nan
+        print('Velocity', self.velocity[~np.isnan(self.velocity)][:10])
+        print('Velocity V2', self.velocity_v2[~np.isnan(self.velocity_v2)][:10])
 
         eye_positions_elmo = np.column_stack((self.eye_position_x_elmo, self.eye_position_y_elmo, self.eye_position_z_elmo))
         gaze_positions_elmo = np.column_stack((self.gaze_point_x_elmo, self.gaze_point_y_elmo, self.gaze_point_z_elmo))
@@ -435,6 +440,7 @@ class FixationFilter():
         self.average_theta = []
         # number of samples in window length
         window_size = int(window_length / np.mean(np.diff(self.time)))
+        print('Window Size', window_size)
         # calculate the average velocity
         for i in range(len(self.gaze_point_x)):
             # Determine start and end indices of the window
@@ -455,11 +461,15 @@ class FixationFilter():
                 # calculate velocity
                 velocity = angle / time_difference
                 self.average_theta.append(angle)
-                self.average_velocity.append(velocity)
-                
+                self.average_velocity.append(velocity)     
             else:
                 self.average_velocity.append(np.nan)
                 self.average_theta.append(np.nan)
+        # print 10 first velocities that are not nan
+        # convert to numpy array
+        self.average_velocity = np.array(self.average_velocity)
+        print('Average Velocity', self.average_velocity[~np.isnan(self.average_velocity)][:10])
+
 
     def average_velocity_calculator_elmo (self, window_length=0.020):
         self.average_velocity_elmo = []
@@ -628,6 +638,7 @@ class FixationFilter():
         self.merged_fixations_elmo = self.merge_fixations(self.fixations_elmo, self.time_elmo, self.theta_elmo)
 
         self.final_fixations, self.final_fixation_count = self.discard_fixations(self.merged_fixations, self.classifications, self.pixels_x, self.pixels_y, self.time)
+        
         # calculate total fixation duration and average fixation duration
         self.total_fixation_duration = np.sum([fixation['duration'] for fixation in self.final_fixations])
         self.average_fixation_duration = self.total_fixation_duration / self.final_fixation_count
