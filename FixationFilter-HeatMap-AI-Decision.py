@@ -1100,14 +1100,14 @@ class FixationFilter():
         # title 
         plt.title('Heatmap of Fixations')
         # labels
-        plt.xlabel('X-axis Pixels')
-        plt.ylabel('Y-axis Pixels')
+        plt.xlabel('Screen Width [px]')
+        plt.ylabel('Screen Height [px]')
         plt.xlim(0, self.window_size[0])
         plt.ylim(0, self.window_size[1])
         plt.gca().invert_yaxis()  
-        plt.colorbar(label = 'Based on duration and position of fixation')
+        plt.colorbar(label = 'Fixation Intensity (based on duration and position)')
         plt.grid()
-        plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 300)
+        plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 600)
 
     def plot_fixation_map(self, fixations, file):
         '''Plot the fixation map of the fixations, size of scatter depends on duration of fixation'''
@@ -1147,7 +1147,7 @@ class FixationFilter():
         plt.gca().invert_yaxis()  
         plt.grid()
         plt.legend()
-        plt.savefig('images/scanpath_fixations_'+ file + '.png', dpi = 300)
+        plt.savefig('images/scanpath_fixations_'+ file + '.png', dpi = 600)
     
     def plot_gaze_and_velocity(self):
         plt.figure()
@@ -1188,7 +1188,7 @@ class FixationFilter():
             for fixation in self.ai_decision_fixations:
                 writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
 
-        # self.plot_heatmap_fixations(self.final_fixations, self.file)
+        self.plot_heatmap_fixations(self.final_fixations, self.file)
         # self.plot_scanpath_fixations(self.final_fixations, self.file)
         # self.plot_fixation_map(self.final_fixations, self.file)
     
@@ -1231,7 +1231,7 @@ class FixationFilter():
                 writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
 
 
-        # self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
+        self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
         # self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
         # self.plot_fixation_map(self.final_fixations_elmo, self.file2)
 

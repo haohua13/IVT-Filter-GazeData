@@ -224,6 +224,11 @@ def plot_heatmap_fixations(fixations, file, XAI, samples, window_size = (int(192
         lowbound = np.mean(heatmap[heatmap > 0])
         heatmap[heatmap < lowbound] = 0
 
+        # Arial font
+        plt.rcParams['font.family'] = 'Arial'
+        # set the font size
+        plt.rcParams.update({'font.size': 8})
+
         # plot heatmap
         plt.figure()
         # draw image file
@@ -236,23 +241,23 @@ def plot_heatmap_fixations(fixations, file, XAI, samples, window_size = (int(192
 
         # draw heatmap on top of image
         average_heatmap = heatmap/samples # average heatmap
-        # Arial font
-        plt.rcParams['font.family'] = 'Arial'
-
         plt.imshow(average_heatmap, cmap = 'viridis', alpha = alpha) 
         # title 
-        plt.title('Fixation Heatmap for XAI = {XAI} condition'.format(XAI = XAI))
-
+        # plt.title('Fixation Heatmap for XAI = {XAI} condition'.format(XAI = XAI))
         # labels
-        plt.xlabel('X-axis Pixels')
-        plt.ylabel('Y-axis Pixels')
+        plt.xlabel('Width [px]')
+        plt.ylabel('Height [px]')
         plt.xlim(0, window_size[0])
+        plt.xticks([0, window_size[0]/4, window_size[0]/2, window_size[0]/4 + window_size[0]/2, window_size[0]])
         plt.ylim(0, window_size[1])
+        plt.yticks([0, window_size[1]/4, window_size[1]/2, window_size[1]/4 + window_size[1]/2, window_size[1]])
 
         # plt.gca().invert_yaxis()  
-        plt.colorbar(label = 'Based on duration and position of fixations')
+        # make color bar same size as heatmap
+        plt.colorbar(label = 'Fixation Intensity', fraction = 0.047*(window_size[1]/window_size[0]), pad = 0.04)
         plt.grid()
-        plt.savefig('images/heatmap_fixations'+ file + '.png', dpi = 1200)
+        plt.savefig('images/heatmap_fixations'+ file + '.png', dpi = 1200, bbox_inches='tight')
+        plt.savefig('images/heatmap_fixations'+ file + '.pdf', dpi = 600, bbox_inches='tight')
 
 if __name__ == '__main__':
     directory = 'gaze_data/fixation_data_heatmap/'
