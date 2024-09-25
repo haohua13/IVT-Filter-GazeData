@@ -8,11 +8,12 @@ import os
 import csv
 
 class FixationFilter():
-    def __init__(self, data, data2, game_start, game_end, ID, task_data):
+    def __init__(self, data, data2, game_start, game_end, ID, task_data, xai_duration):
 
         self.id = ID
         self.task_data = task_data
 
+        self.xai_duration = xai_duration
         self.elmo_width = 20  # 18 + 2 tolerance
         self.elmo_height = 16 # 14 + 2 tolerance
 
@@ -694,7 +695,7 @@ class FixationFilter():
                 intervals.append((0, closest_index, -1))
                 print(self.time[closest_index])
                 previous_start = closest_index
-            elif self.task_data['event'][i] == 'tutorial_task':
+            elif self.task_data['event'][i] == 'tutorial_task': # tutorial task
                 print('User finished Tutorial Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
                 intervals.append((previous_start, closest_index, 0))
@@ -723,8 +724,8 @@ class FixationFilter():
 
     def fixations_over_task(self):
         
-        interval_data = {'ID': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixations_counts_elmo': [], 
-                         'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixations_counts_elmo': [], 'game_percentage': [], 'task': []}
+        interval_data = {'ID': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixation_counts_elmo': [], 
+                         'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixation_counts_elmo': [], 'game_percentage': [], 'task': []}
 
         acc_interval_fixation_duration = 0
         acc_interval_fixation_count = 0
@@ -734,17 +735,35 @@ class FixationFilter():
 
         intervals = self.calculate_task_intervals()
 
+        # iterate through each task interval
+        previous_task = None
+
         for start, end, task in intervals:
             interval_fixation_duration = 0
             interval_fixation_count = 0
             interval_fixation_duration_elmo = 0
             interval_fixation_count_elmo = 0
-
             print('Start:', start, 'End:', end, 'Task:', task)
+            if task == previous_task and self.id.startswith('OX'):
+                xai_duration_file = self.xai_duration[self.xai_duration['task'] == task]
+                xai_duration = (xai_duration_file['xai_duration'] + xai_duration_file['rec_duration']).iloc[0]
+                start_xai_removed = self.time[start] + xai_duration # remove XAI duration
+                # obtain index closest to start_xai_removed
+                index_start = min(range(len(self.time)), key=lambda j: abs(self.time[j] - start_xai_removed))
+            elif task == previous_task: # for other participants in O condition
+                xai_duration_file = self.xai_duration[self.xai_duration['task'] == task]
+                duration = xai_duration_file['rec_duration'].iloc[0]
+                start_rec_removed = self.time[start] + duration
+                index_start = min(range(len(self.time)), key=lambda j: abs(self.time[j] - start_rec_removed))
+            else:
+                index_start = start
+            print('Index Start:', index_start, 'Task', task, 'ID:', self.id)
             for fixation in self.final_fixations:
-                if fixation['end'] <= end and fixation['start'] >= start:
-                    interval_fixation_duration += fixation['duration']
-                    interval_fixation_count += 1
+                # check if fixation is within the interval of the task and in human-ai decision
+                if fixation['start'] >= index_start and fixation['end'] <= end:
+                        interval_fixation_duration += fixation['duration']
+                        interval_fixation_count += 1
+
             acc_interval_fixation_duration += interval_fixation_duration
             acc_interval_fixation_count += interval_fixation_count
 
@@ -754,20 +773,21 @@ class FixationFilter():
             interval_data['accumulate_fixation_counts'].append(acc_interval_fixation_count)
 
             for fixation in self.final_fixations_elmo:
-                if fixation['end'] <= end and fixation['start'] >= start:
-                    interval_fixation_duration_elmo += fixation['duration']
-                    interval_fixation_count_elmo += 1
+                if fixation['start'] >= index_start and fixation['end'] <= end:
+                        interval_fixation_duration_elmo += fixation['duration']
+                        interval_fixation_count_elmo += 1
+
             acc_interval_fixation_duration_elmo += interval_fixation_duration_elmo
             acc_interval_fixation_count_elmo += interval_fixation_count_elmo
 
             interval_data['fixation_durations_elmo'].append(interval_fixation_duration_elmo/interval_fixation_count_elmo if interval_fixation_count_elmo != 0 else 0)
-            interval_data['fixations_counts_elmo'].append(interval_fixation_count_elmo)
+            interval_data['fixation_counts_elmo'].append(interval_fixation_count_elmo)
             interval_data['accumulate_fixation_durations_elmo'].append(acc_interval_fixation_duration_elmo)
-            interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)
+            interval_data['accumulate_fixation_counts_elmo'].append(acc_interval_fixation_count_elmo)
             interval_data['game_percentage'].append(end/total_time*100)
             interval_data['task'].append(task)
+            previous_task = task
 
-            
         self.interval_data = interval_data
         print('INTERVAL DATA:', self.interval_data)
         self.write_to_file()
@@ -829,13 +849,13 @@ class FixationFilter():
         # Convert interval_data to DataFrame
         df = pd.DataFrame(self.interval_data)
         # if file already exists, append to it
-        if os.path.exists('interval_data.csv'):
-            df.to_csv('interval_data.csv', mode='a', header=False, index=False)
+        if os.path.exists('interval_data_XAI_removed.csv'):
+            df.to_csv('interval_data_XAI_removed.csv', mode='a', header=False, index=False)
         else:
             # Write DataFrame to CSV
-            df.to_csv('interval_data.csv', index=False)
+            df.to_csv('interval_data_XAI_removed.csv', index=False)
 
-        print('Data written to interval_data.csv')
+        print('Data written to interval data XAI removed')
 
 
     def merge_fixations(self, fixations, time, theta):
@@ -905,7 +925,7 @@ class FixationFilter():
 
     def save_data(self):
         # write to a csv file
-        with open('tracker_results-by-decision.csv', 'a', newline='') as file:
+        with open('tracker_results-by-xai-duration.csv', 'a', newline='') as file:
             writer = csv.writer(file)
             game_time = self.time[-1] - self.time[0]
             writer.writerow([self.id, self.final_fixation_count, self.final_fixation_count_elmo, self.average_fixation_duration, self.average_fixation_duration_elmo, self.total_fixation_duration, self.total_fixation_duration_elmo, game_time])
@@ -1236,10 +1256,10 @@ if __name__ == '__main__':
     end_times = game_data['end_datetime']
     identification = game_data['ID']
 
-    task_data = pd.read_csv('mushroom_data/task-times-by-decision.csv') # contains the timestamps of the tasks
+    task_data = pd.read_csv('mushroom_data/task-times-by-decision.csv')
     xai_duration = pd.read_csv('gaze_data/XAI_durations.csv') # contains the duration of the XAI explanation for each participant
 
-    with open('tracker_results-by-decision.csv', 'a', newline='') as file:
+    with open('tracker_results-by-xai-duration.csv', 'a', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['ID', 'computer_fixation_count', 'elmo_fixation_count', 'computer_average_fixation_duration', 'elmo_average_fixation_duration', 'computer_total_fixation_duration', 'elmo_total_fixation_duration', 'game_time'])
 
@@ -1279,8 +1299,7 @@ if __name__ == '__main__':
         current_task_data = task_data[task_data['ID'] == user]
         print(current_task_data)
         current_task_data = current_task_data.reset_index(drop=True)
-
-        fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user, current_task_data)
+        fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user, current_task_data, xai_duration)
         fixation_filter.process_data()
         # fixation_filter.plot_gaze_and_velocity()
         # fixation_filter.plot_gaze_and_velocity_elmo()

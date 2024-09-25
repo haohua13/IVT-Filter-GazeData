@@ -671,8 +671,10 @@ class FixationFilter():
         self.total_fixation_duration_elmo = np.sum([fixation['duration'] for fixation in self.final_fixations_elmo])
         self.average_fixation_duration_elmo = self.total_fixation_duration_elmo / self.final_fixation_count_elmo
         
-        self.fixations_over_task()
+        # self.fixations_over_task()
         # self.fixations_over_time()
+
+        self.calculate_fixations_ai_decision()
 
         print('TOTAL FIXATION DURATION:', self.total_fixation_duration)
         print('AVERAGE FIXATION DURATION:', self.average_fixation_duration)
@@ -691,39 +693,54 @@ class FixationFilter():
             if self.task_data['event'][i] == 'click_to_tutorial': # first task
                 print('User clicked to Tutorial:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
-                intervals.append((0, closest_index, -1))
+                intervals.append((0, closest_index, -1, "click_to_tutorial"))
                 print(self.time[closest_index])
                 previous_start = closest_index
             elif self.task_data['event'][i] == 'tutorial_task':
                 print('User finished Tutorial Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
-                intervals.append((previous_start, closest_index, 0))
+                intervals.append((previous_start, closest_index, 0, "tutorial"))
                 previous_start = closest_index
 
             elif self.task_data['event'][i] == 'end_human_decision' and i>8:
                 print('End Human Task/Start AI-Human Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
-                intervals.append((previous_start, closest_index, task))
+                intervals.append((previous_start, closest_index, task, "end_human_decision"))
                 previous_start = closest_index
-                
-            # elif self.task_data['event'][i] == 'end_human_ai_decision' and i>8:
-            #     print('End Human-AI Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
-            #     closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
-            #     intervals.append((previous_start, closest_index, task))
-            #     previous_start = closest_index   
-            
+
             elif self.task_data['event'][i] == 'feedback' and i>8:
                 print('Feedback/End Of Task:', i, 'Timestamp:', self.task_data['timestamp'][i])
                 closest_index = min(range(len(self.time)), key=lambda j: abs(self.time[j] - self.task_data['timestamp'][i]))
-                intervals.append((previous_start, closest_index, task))
+                intervals.append((previous_start, closest_index, task, "feedback"))
                 previous_start = closest_index
                 task = task + 1
             print('Intervals:', intervals)
         return intervals
 
+    def calculate_fixations_ai_decision(self):
+        '''Calculate the fixations during the AI decision task'''
+        intervals = self.calculate_task_intervals()
+        relevant_intervals =[] # "end_human_decision" and "feedback"
+        for start, end, task, task_name in intervals:
+            if task_name == "end_human_decision" or task_name == "feedback":
+                relevant_intervals.append((start, end, task, task_name))
+        print('Relevant Intervals:', relevant_intervals)
+        # calculate fixations during the AI decision task
+        self.ai_decision_fixations = []
+        self.ai_decision_fixations_elmo = []
+        for start, end, task, task_name in relevant_intervals:
+            for fixation in self.final_fixations:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    self.ai_decision_fixations.append(fixation)
+            for fixation in self.final_fixations_elmo:
+                if fixation['end'] <= end and fixation['start'] >= start:
+                    self.ai_decision_fixations_elmo.append(fixation)
+        print('AI Decision Fixations:', self.ai_decision_fixations)
+        print('AI Decision Fixations Elmo:', self.ai_decision_fixations_elmo)
+
     def fixations_over_task(self):
         
-        interval_data = {'ID': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixations_counts_elmo': [], 
+        interval_data = {'id': self.id, 'fixation_durations': [], 'fixation_counts': [], 'fixation_durations_elmo': [], 'fixations_counts_elmo': [], 
                          'accumulate_fixation_durations': [], 'accumulate_fixation_counts': [], 'accumulate_fixation_durations_elmo': [], 'accumulate_fixations_counts_elmo': [], 'game_percentage': [], 'task': []}
 
         acc_interval_fixation_duration = 0
@@ -734,7 +751,7 @@ class FixationFilter():
 
         intervals = self.calculate_task_intervals()
 
-        for start, end, task in intervals:
+        for start, end, task, task_name in intervals:
             interval_fixation_duration = 0
             interval_fixation_count = 0
             interval_fixation_duration_elmo = 0
@@ -766,12 +783,10 @@ class FixationFilter():
             interval_data['accumulate_fixations_counts_elmo'].append(acc_interval_fixation_count_elmo)
             interval_data['game_percentage'].append(end/total_time*100)
             interval_data['task'].append(task)
-
             
         self.interval_data = interval_data
         print('INTERVAL DATA:', self.interval_data)
         self.write_to_file()
-
 
 
 
@@ -1085,14 +1100,14 @@ class FixationFilter():
         # title 
         plt.title('Heatmap of Fixations')
         # labels
-        plt.xlabel('X-axis Pixels')
-        plt.ylabel('Y-axis Pixels')
+        plt.xlabel('Screen Width [px]')
+        plt.ylabel('Screen Height [px]')
         plt.xlim(0, self.window_size[0])
         plt.ylim(0, self.window_size[1])
         plt.gca().invert_yaxis()  
-        plt.colorbar(label = 'Based on duration and position of fixation')
+        plt.colorbar(label = 'Fixation Intensity (based on duration and position)')
         plt.grid()
-        plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 300)
+        plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 600)
 
     def plot_fixation_map(self, fixations, file):
         '''Plot the fixation map of the fixations, size of scatter depends on duration of fixation'''
@@ -1132,7 +1147,7 @@ class FixationFilter():
         plt.gca().invert_yaxis()  
         plt.grid()
         plt.legend()
-        plt.savefig('images/scanpath_fixations_'+ file + '.png', dpi = 300)
+        plt.savefig('images/scanpath_fixations_'+ file + '.png', dpi = 600)
     
     def plot_gaze_and_velocity(self):
         plt.figure()
@@ -1167,14 +1182,13 @@ class FixationFilter():
 
 
         # save final_fixations to csv file
-        with open('gaze_data/fixation_data_heatmap/final_fixations'+ self.id + '.csv', 'w', newline='') as file:
+        with open('gaze_data/fixation_data_heat_map_AI_decision/final_fixations'+ self.id + '.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
-            for fixation in self.final_fixations:
+            for fixation in self.ai_decision_fixations:
                 writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
 
-
-        # self.plot_heatmap_fixations(self.final_fixations, self.file)
+        self.plot_heatmap_fixations(self.final_fixations, self.file)
         # self.plot_scanpath_fixations(self.final_fixations, self.file)
         # self.plot_fixation_map(self.final_fixations, self.file)
     
@@ -1210,14 +1224,14 @@ class FixationFilter():
         # plt.savefig('images/gaze_and_velocity_plot_elmo_'+ self.file2 + '.png', dpi = 300)
 
         # save final_fixations to csv file
-        with open('gaze_data/fixation_data_heatmap/final_fixations_elmo'+ self.id + '.csv', 'w', newline='') as file:
+        with open('gaze_data/fixation_data_heat_map_AI_decision/final_fixations_elmo'+ self.id + '.csv', 'w', newline='') as file:
             writer = csv.writer(file)
             writer.writerow(['start', 'end', 'duration', 'average_x', 'average_y', 'average_time'])
-            for fixation in self.final_fixations_elmo:
+            for fixation in self.ai_decision_fixations_elmo:
                 writer.writerow([fixation['start'], fixation['end'], fixation['duration'], fixation['average_position_x'], fixation['average_position_y'], fixation['average_time']])
 
 
-        # self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
+        self.plot_heatmap_fixations(self.final_fixations_elmo, self.file2)
         # self.plot_scanpath_fixations(self.final_fixations_elmo, self.file2)
         # self.plot_fixation_map(self.final_fixations_elmo, self.file2)
 
@@ -1236,8 +1250,7 @@ if __name__ == '__main__':
     end_times = game_data['end_datetime']
     identification = game_data['ID']
 
-    task_data = pd.read_csv('mushroom_data/task-times-by-decision.csv') # contains the timestamps of the tasks
-    xai_duration = pd.read_csv('gaze_data/XAI_durations.csv') # contains the duration of the XAI explanation for each participant
+    task_data = pd.read_csv('mushroom_data/task-times-by-decision.csv')
 
     with open('tracker_results-by-decision.csv', 'a', newline='') as file:
         writer = csv.writer(file)
@@ -1282,8 +1295,8 @@ if __name__ == '__main__':
 
         fixation_filter = FixationFilter(data_screen, data_elmo, start_timestamp, end_timestamp, user, current_task_data)
         fixation_filter.process_data()
-        # fixation_filter.plot_gaze_and_velocity()
-        # fixation_filter.plot_gaze_and_velocity_elmo()
+        fixation_filter.plot_gaze_and_velocity()
+        fixation_filter.plot_gaze_and_velocity_elmo()
 
 
 
