@@ -224,6 +224,15 @@ def plot_heatmap_fixations(fixations, file, XAI, samples, window_size = (int(192
         lowbound = np.mean(heatmap[heatmap > 0])
         heatmap[heatmap < lowbound] = 0
 
+        # added this
+        # Normalize heatmap to range [0, 10]
+        heatmap_min = np.min(heatmap)
+        heatmap_max = np.max(heatmap)
+        if heatmap_max - heatmap_min > 0:
+            heatmap = (heatmap - heatmap_min) / (heatmap_max - heatmap_min) * 10
+        else:
+            heatmap = np.zeros_like(heatmap)
+
         # Arial font
         plt.rcParams['font.family'] = 'Arial'
         # set the font size

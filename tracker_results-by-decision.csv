@@ -56,3 +56,8 @@ OX31,440,325,1.313494593446905,0.30216869500967175,577.9376211166382,98.20482587
 OX32,1071,522,0.7774031634201634,0.3432518399081468,832.598788022995,179.1774604320526,1125.97363615036
 OX33,378,531,1.4061101807488336,0.29539835295883726,531.5096483230591,156.85652542114258,703.9281694889069
 OX34,589,595,1.1120009454685076,0.28865234711590937,654.9685568809509,171.74814653396606,860.9510383605957
+ID,computer_fixation_count,elmo_fixation_count,computer_average_fixation_duration,elmo_average_fixation_duration,computer_total_fixation_duration,elmo_total_fixation_duration,game_time
+O20,314,41,1.2786420158519867,0.590730021639568,401.4935929775238,24.21993088722229,865.9520316123962
+ID,computer_fixation_count,elmo_fixation_count,computer_average_fixation_duration,elmo_average_fixation_duration,computer_total_fixation_duration,elmo_total_fixation_duration,game_time
+O20,314,41,1.2786420158519867,0.590730021639568,401.4935929775238,24.21993088722229,865.9520316123962
+ID,computer_fixation_count,elmo_fixation_count,computer_average_fixation_duration,elmo_average_fixation_duration,computer_total_fixation_duration,elmo_total_fixation_duration,game_time
