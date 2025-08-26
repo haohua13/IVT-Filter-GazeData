@@ -1107,7 +1107,7 @@ class FixationFilter():
         plt.gca().invert_yaxis()  
         plt.colorbar(label = 'Fixation Intensity (based on duration and position)')
         plt.grid()
-        plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 600)
+        plt.savefig('images/heatmap_fixations_'+ file + '.pdf', dpi = 600)
 
     def plot_fixation_map(self, fixations, file):
         '''Plot the fixation map of the fixations, size of scatter depends on duration of fixation'''
@@ -1147,7 +1147,7 @@ class FixationFilter():
         plt.gca().invert_yaxis()  
         plt.grid()
         plt.legend()
-        plt.savefig('images/scanpath_fixations_'+ file + '.png', dpi = 600)
+        plt.savefig('images/scanpath_fixations_'+ file + '.pdf', dpi = 600)
     
     def plot_gaze_and_velocity(self):
         plt.figure()

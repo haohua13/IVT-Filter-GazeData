@@ -1112,7 +1112,7 @@ class FixationFilter():
         plt.gca().invert_yaxis()  
         plt.colorbar(label = 'Based on duration and position of fixation')
         plt.grid()
-        plt.savefig('images/heatmap_fixations_'+ file + '.png', dpi = 300)
+        plt.savefig('images/heatmap_fixations_'+ file + '.pdf', dpi = 600)
 
     def plot_fixation_map(self, fixations, file):
         '''Plot the fixation map of the fixations, size of scatter depends on duration of fixation'''
